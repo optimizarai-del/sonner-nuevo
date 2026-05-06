@@ -36,3 +36,12 @@ backend/google_client_secrets.json
 .vscode/
 .idea/
 *.swp
+
+# Google credentials (NUNCA subir)
+backend/credentials.json
+backend/google_credentials_output.txt
+backend/google_token.json
+backend/google_client_secrets.json
+*.json
+!frontend/package.json
+!frontend/package-lock.json
