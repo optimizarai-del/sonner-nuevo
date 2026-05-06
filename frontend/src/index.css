@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  body {
+    background-color: #0D1117;
+    color: #E6EDF3;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: #161B22; }
+  ::-webkit-scrollbar-thumb { background: #30363D; border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #2B6BF3; }
+}
+
+@layer components {
+  .card {
+    @apply bg-[#161B22] border border-[#21262D] rounded-xl;
+  }
+  .btn-primary {
+    @apply bg-snr-500 hover:bg-snr-600 text-white font-medium px-4 py-2 rounded-lg
+           transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply text-[#8B949E] hover:text-white hover:bg-[#1C2230] px-3 py-2 rounded-lg
+           transition-colors text-sm font-medium;
+  }
+  .input {
+    @apply w-full bg-[#0D1117] border border-[#30363D] rounded-lg px-3 py-2.5
+           text-sm text-white placeholder-[#484F58]
+           focus:outline-none focus:border-snr-500 transition-colors;
+  }
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+}

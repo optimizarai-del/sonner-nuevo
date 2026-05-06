@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Node / Frontend
+node_modules/
+dist/
+.DS_Store
+
+# Dev / runtime files
+backend/run_dev.py
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+backend/google_token.json
+backend/google_client_secrets.json
+
+# Logs
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
