@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, MessageSquare, FileText, Brain, Send, Settings, LogOut } from "lucide-react";
+import { LayoutDashboard, MessageSquare, FileText, Brain, Send, Settings, LogOut, Users, Shield } from "lucide-react";
 
 const TgIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -9,11 +9,12 @@ const TgIcon = () => (
 
 const NAV = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/crm",       icon: Users,           label: "CRM" },
   { to: "/chat",      icon: MessageSquare,   label: "Chat interno" },
+  { to: "/contratos", icon: FileText,        label: "Contratos" },
   { to: "/mensajes",  icon: Send,            label: "Mensajes" },
   { to: "/analista",  icon: Brain,           label: "Analista IA" },
-  { to: "/contratos", icon: FileText,        label: "Contratos" },
-  { to: "/telegram",  icon: TgIcon,          label: "Telegram" },
+  { to: "/telegram",  icon: TgIcon,          label: "Agente externo" },
   { to: "/admin",     icon: Settings,        label: "Admin" },
 ];
 
@@ -22,6 +23,7 @@ export default function Sidebar() {
 
   return (
     <aside className="w-56 flex flex-col shrink-0" style={{ background: "#161B22", borderRight: "1px solid #21262D" }}>
+
       {/* Logo */}
       <div className="p-5 flex items-center gap-3" style={{ borderBottom: "1px solid #21262D" }}>
         <div
@@ -37,7 +39,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 space-y-0.5">
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
         {NAV.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}

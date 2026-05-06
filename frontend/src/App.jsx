@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout/Layout";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
+import Crm from "./pages/Crm";
 import Mensajes from "./pages/Mensajes";
 import Analista from "./pages/Analista";
 import Contratos from "./pages/Contratos";
@@ -27,8 +28,9 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index        element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="crm"       element={<Crm />} />
           <Route path="chat"      element={<Chat />} />
           <Route path="mensajes"  element={<Mensajes />} />
           <Route path="analista"  element={<Analista />} />
