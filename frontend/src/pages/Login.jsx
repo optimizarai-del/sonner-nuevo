@@ -1,31 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../utils/api";
+
+const ADMIN_USER = import.meta.env.VITE_ADMIN_USERNAME || "admin";
+const ADMIN_PASS = import.meta.env.VITE_ADMIN_PASSWORD || "sonner2026";
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [error, setError]       = useState("");
   const navigate = useNavigate();
 
-  async function handleSubmit(e) {
+  function handleSubmit(e) {
     e.preventDefault();
-    setLoading(true);
-    setError("");
-    try {
-      const form = new URLSearchParams();
-      form.append("username", username);
-      form.append("password", password);
-      const { data } = await api.post("/admin/token", form, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      });
-      localStorage.setItem("sonner_token", data.access_token);
+    if (username.trim() === ADMIN_USER && password === ADMIN_PASS) {
+      localStorage.setItem("sonner_token", "authenticated");
       navigate("/dashboard");
-    } catch {
+    } else {
       setError("Usuario o contraseña incorrectos");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -62,6 +53,7 @@ export default function Login() {
                 className="input"
                 placeholder="admin"
                 required
+                autoComplete="username"
               />
             </div>
             <div>
@@ -73,6 +65,7 @@ export default function Login() {
                 className="input"
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
               />
             </div>
             {error && (
@@ -80,13 +73,10 @@ export default function Login() {
             )}
             <button
               type="submit"
-              disabled={loading}
               className="btn-primary w-full text-sm py-3 mt-2"
-              style={{
-                boxShadow: loading ? "none" : "0 0 20px #2B6BF333",
-              }}
+              style={{ boxShadow: "0 0 20px #2B6BF333" }}
             >
-              {loading ? "Entrando..." : "Entrar"}
+              Entrar
             </button>
           </form>
         </div>

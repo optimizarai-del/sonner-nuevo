@@ -1,28 +1,31 @@
 import { useState, useEffect } from "react";
-import { FileText, Download, Plus, X, Check, AlertCircle } from "lucide-react";
-import api from "../utils/api";
+import { FileText, Download, ExternalLink, Plus, X, Check, AlertCircle, Loader2 } from "lucide-react";
+import { supabase } from "../utils/supabase";
+import { WEBHOOKS, callWebhook } from "../utils/n8n";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+// ── Valores vacíos del formulario ─────────────────────────────────────────────
 const EMPTY = {
-  nombre_prestatario: "",
-  DNI_prestatario: "",
-  domicilio_prestatario: "",
-  lugar_evento: "",
-  dia_evento: "",
-  hora_inicio: "",
-  hora_fin: "",
-  dias_para_pagar: "30",
+  nombre_prestatario:     "",
+  DNI_prestatario:        "",
+  domicilio_prestatario:  "",
+  lugar_evento:           "",
+  dia_evento:             "",
+  hora_inicio:            "",
+  hora_fin:               "",
+  dias_para_pagar:        "30",
   valor_total_prestacion: "",
-  equipamientos: "",
-  monto_total_pesos: "",
-  monto_total_reserva: "",
-  saldo_a_cancelar: "",
-  dia_firma: "",
-  mes_firma: "",
-  año_firma: new Date().getFullYear().toString(),
+  equipamientos:          "",
+  monto_total_pesos:      "",
+  monto_total_reserva:    "",
+  saldo_a_cancelar:       "",
+  dia_firma:              "",
+  mes_firma:              "",
+  año_firma:              new Date().getFullYear().toString(),
 };
 
+// ── Sub-componentes ───────────────────────────────────────────────────────────
 function Field({ label, children }) {
   return (
     <div>
@@ -32,70 +35,111 @@ function Field({ label, children }) {
   );
 }
 
-function Input({ ...props }) {
-  return (
-    <input
-      className="input w-full"
-      {...props}
-    />
-  );
+function Inp(props) {
+  return <input className="input w-full" {...props} />;
 }
 
-function Textarea({ ...props }) {
-  return (
-    <textarea
-      rows={3}
-      className="input w-full resize-none"
-      {...props}
-    />
-  );
+function Textarea(props) {
+  return <textarea rows={3} className="input w-full resize-none" {...props} />;
 }
 
+// ── Componente principal ──────────────────────────────────────────────────────
 export default function Contratos() {
-  const [form, setForm] = useState(EMPTY);
+  const [form, setForm]       = useState(EMPTY);
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState("");
+  const [result, setResult]   = useState(null);   // { doc_url, pdf_url }
+  const [error, setError]     = useState("");
   const [historial, setHistorial] = useState([]);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm]   = useState(false);
+  const [loadingHist, setLoadingHist] = useState(true);
 
-  useEffect(() => {
-    api.get("/contratos").then(({ data }) => setHistorial(data)).catch(() => {});
-  }, [result]);
+  // ── Cargar historial desde Supabase ─────────────────────────────────────────
+  async function loadHistorial() {
+    setLoadingHist(true);
+    const { data } = await supabase
+      .from("contratos")
+      .select("id, nombre_prestatario, lugar_evento, dia_evento, doc_url, pdf_url, created_at")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setHistorial(data ?? []);
+    setLoadingHist(false);
+  }
+
+  useEffect(() => { loadHistorial(); }, []);
 
   function set(field) {
     return (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
   }
 
+  // ── Enviar a n8n ─────────────────────────────────────────────────────────────
   async function submit(e) {
     e.preventDefault();
     setLoading(true);
     setError("");
     setResult(null);
+
+    const payload = {
+      ...form,
+      valor_total_prestacion: parseInt(form.valor_total_prestacion) || 0,
+      monto_total_pesos:      parseInt(form.monto_total_pesos)      || 0,
+      monto_total_reserva:    parseInt(form.monto_total_reserva)    || 0,
+      saldo_a_cancelar:       parseInt(form.saldo_a_cancelar)       || 0,
+    };
+
     try {
-      const payload = {
-        ...form,
-        valor_total_prestacion: parseInt(form.valor_total_prestacion) || 0,
-        monto_total_pesos: parseInt(form.monto_total_pesos) || 0,
-        monto_total_reserva: parseInt(form.monto_total_reserva) || 0,
-        saldo_a_cancelar: parseInt(form.saldo_a_cancelar) || 0,
-      };
-      const { data } = await api.post("/contratos", payload);
-      setResult(data);
+      // 1. n8n copia el template, rellena placeholders, exporta PDF → devuelve URLs
+      const data = await callWebhook(WEBHOOKS.contratos, payload);
+
+      const doc_url = data?.doc_url  ?? data?.google_doc_url ?? data?.docUrl ?? null;
+      const pdf_url = data?.pdf_url  ?? data?.pdf            ?? data?.pdfUrl ?? null;
+
+      // 2. Guardar en Supabase para historial
+      await supabase.from("contratos").insert({
+        nombre_prestatario:     payload.nombre_prestatario,
+        dni_prestatario:        payload.DNI_prestatario,
+        domicilio_prestatario:  payload.domicilio_prestatario,
+        lugar_evento:           payload.lugar_evento,
+        dia_evento:             payload.dia_evento,
+        hora_inicio:            payload.hora_inicio,
+        hora_fin:               payload.hora_fin,
+        dias_para_pagar:        payload.dias_para_pagar,
+        valor_total_prestacion: payload.valor_total_prestacion,
+        equipamientos:          payload.equipamientos,
+        monto_total_pesos:      payload.monto_total_pesos,
+        monto_total_reserva:    payload.monto_total_reserva,
+        saldo_a_cancelar:       payload.saldo_a_cancelar,
+        dia_firma:              payload.dia_firma,
+        mes_firma:              payload.mes_firma,
+        anio_firma:             payload.año_firma,
+        doc_url,
+        pdf_url,
+      });
+
+      setResult({ doc_url, pdf_url });
+      setForm(EMPTY);
       setShowForm(false);
+      loadHistorial();
+
     } catch (err) {
-      setError(err.response?.data?.detail || "Error generando contrato");
+      setError(err.name === "AbortError"
+        ? "Tiempo de espera agotado. Intentá de nuevo."
+        : err.message || "Error generando contrato");
     } finally {
       setLoading(false);
     }
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="p-6 max-w-4xl mx-auto">
+
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-white">Contratos</h1>
-          <p className="text-sm mt-0.5" style={{ color: "#484F58" }}>Generación automática de PDF desde template</p>
+          <p className="text-sm mt-0.5" style={{ color: "#484F58" }}>
+            Generación automática — Google Docs + PDF via n8n
+          </p>
         </div>
         <button
           onClick={() => { setShowForm(true); setResult(null); setError(""); }}
@@ -107,24 +151,40 @@ export default function Contratos() {
         </button>
       </div>
 
+      {/* Resultado exitoso */}
       {result && (
         <div className="rounded-xl p-4 mb-6 flex items-start gap-3" style={{ background: "#0f2c1a", border: "1px solid #2ea043" }}>
           <Check size={18} className="shrink-0 mt-0.5" style={{ color: "#3fb950" }} />
-          <div>
+          <div className="space-y-1">
             <p className="font-medium text-sm" style={{ color: "#3fb950" }}>Contrato generado exitosamente</p>
-            <a
-              href={result.pdf_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm underline mt-1 inline-block"
-              style={{ color: "#79C0FF" }}
-            >
-              Descargar PDF
-            </a>
+            <div className="flex flex-wrap gap-4 mt-2">
+              {result.doc_url && (
+                <a href={result.doc_url} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 text-sm underline"
+                  style={{ color: "#79C0FF" }}>
+                  <ExternalLink size={13} />
+                  Abrir Google Docs
+                </a>
+              )}
+              {result.pdf_url && (
+                <a href={result.pdf_url} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1.5 text-sm underline"
+                  style={{ color: "#79C0FF" }}>
+                  <Download size={13} />
+                  Descargar PDF
+                </a>
+              )}
+              {!result.doc_url && !result.pdf_url && (
+                <span className="text-sm" style={{ color: "#8B949E" }}>
+                  Contrato guardado. Revisá Google Drive.
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}
 
+      {/* Formulario */}
       {showForm && (
         <div className="rounded-2xl p-6 mb-6" style={{ background: "#161B22", border: "1px solid #21262D" }}>
           <div className="flex items-center justify-between mb-5">
@@ -135,60 +195,65 @@ export default function Contratos() {
           </div>
 
           <form onSubmit={submit} className="space-y-5">
+
+            {/* Datos del prestatario */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Nombre del prestatario">
-                <Input value={form.nombre_prestatario} onChange={set("nombre_prestatario")} required placeholder="Juan Pérez" />
+                <Inp value={form.nombre_prestatario} onChange={set("nombre_prestatario")} required placeholder="Juan Pérez" />
               </Field>
               <Field label="DNI">
-                <Input value={form.DNI_prestatario} onChange={set("DNI_prestatario")} required placeholder="42798702" />
+                <Inp value={form.DNI_prestatario} onChange={set("DNI_prestatario")} required placeholder="42798702" />
               </Field>
               <Field label="Domicilio">
-                <Input value={form.domicilio_prestatario} onChange={set("domicilio_prestatario")} required placeholder="Av. Corrientes 1234" />
+                <Inp value={form.domicilio_prestatario} onChange={set("domicilio_prestatario")} required placeholder="Av. Corrientes 1234" />
               </Field>
               <Field label="Lugar del evento">
-                <Input value={form.lugar_evento} onChange={set("lugar_evento")} required placeholder="Salón Sur" />
+                <Inp value={form.lugar_evento} onChange={set("lugar_evento")} required placeholder="Salón Sur" />
               </Field>
               <Field label="Fecha del evento">
-                <Input type="date" value={form.dia_evento} onChange={set("dia_evento")} required />
+                <Inp type="date" value={form.dia_evento} onChange={set("dia_evento")} required />
               </Field>
               <Field label="Días para pagar">
-                <Input type="number" value={form.dias_para_pagar} onChange={set("dias_para_pagar")} required />
+                <Inp type="number" value={form.dias_para_pagar} onChange={set("dias_para_pagar")} required />
               </Field>
               <Field label="Hora inicio">
-                <Input type="time" value={form.hora_inicio} onChange={set("hora_inicio")} required />
+                <Inp type="time" value={form.hora_inicio} onChange={set("hora_inicio")} required />
               </Field>
               <Field label="Hora fin">
-                <Input type="time" value={form.hora_fin} onChange={set("hora_fin")} required />
+                <Inp type="time" value={form.hora_fin} onChange={set("hora_fin")} required />
               </Field>
             </div>
 
+            {/* Montos */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Field label="Valor total ($)">
-                <Input type="number" value={form.valor_total_prestacion} onChange={set("valor_total_prestacion")} required placeholder="5000000" />
+                <Inp type="number" value={form.valor_total_prestacion} onChange={set("valor_total_prestacion")} required placeholder="5000000" />
               </Field>
               <Field label="Total en pesos ($)">
-                <Input type="number" value={form.monto_total_pesos} onChange={set("monto_total_pesos")} required placeholder="300000" />
+                <Inp type="number" value={form.monto_total_pesos} onChange={set("monto_total_pesos")} required placeholder="300000" />
               </Field>
               <Field label="Reserva ($)">
-                <Input type="number" value={form.monto_total_reserva} onChange={set("monto_total_reserva")} required placeholder="5000" />
+                <Inp type="number" value={form.monto_total_reserva} onChange={set("monto_total_reserva")} required placeholder="5000" />
               </Field>
               <Field label="Saldo a cancelar ($)">
-                <Input type="number" value={form.saldo_a_cancelar} onChange={set("saldo_a_cancelar")} required placeholder="295000" />
+                <Inp type="number" value={form.saldo_a_cancelar} onChange={set("saldo_a_cancelar")} required placeholder="295000" />
               </Field>
             </div>
 
+            {/* Fecha de firma */}
             <div className="grid grid-cols-3 gap-4">
               <Field label="Día de firma">
-                <Input type="number" value={form.dia_firma} onChange={set("dia_firma")} required placeholder="15" min="1" max="31" />
+                <Inp type="number" value={form.dia_firma} onChange={set("dia_firma")} required placeholder="15" min="1" max="31" />
               </Field>
               <Field label="Mes de firma">
-                <Input value={form.mes_firma} onChange={set("mes_firma")} required placeholder="julio" />
+                <Inp value={form.mes_firma} onChange={set("mes_firma")} required placeholder="julio" />
               </Field>
               <Field label="Año de firma">
-                <Input type="number" value={form.año_firma} onChange={set("año_firma")} required placeholder="2026" />
+                <Inp type="number" value={form.año_firma} onChange={set("año_firma")} required placeholder="2026" />
               </Field>
             </div>
 
+            {/* Equipamientos */}
             <Field label="Equipamientos">
               <Textarea value={form.equipamientos} onChange={set("equipamientos")} required placeholder="Sonido, luces, DJ..." />
             </Field>
@@ -201,32 +266,35 @@ export default function Contratos() {
             )}
 
             <div className="flex gap-3 justify-end">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
+              <button type="button" onClick={() => setShowForm(false)}
                 className="px-4 py-2 text-sm transition-colors hover:text-white"
-                style={{ color: "#8B949E" }}
-              >
+                style={{ color: "#8B949E" }}>
                 Cancelar
               </button>
-              <button
-                type="submit"
-                disabled={loading}
+              <button type="submit" disabled={loading}
                 className="flex items-center gap-2 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:opacity-50"
-                style={{ background: "#2B6BF3" }}
-              >
-                {loading ? "Generando..." : "Generar contrato"}
+                style={{ background: "#2B6BF3" }}>
+                {loading ? (
+                  <><Loader2 size={14} className="animate-spin" /> Generando...</>
+                ) : (
+                  <><FileText size={14} /> Generar contrato</>
+                )}
               </button>
             </div>
           </form>
         </div>
       )}
 
+      {/* Historial */}
       <div className="rounded-2xl overflow-hidden" style={{ background: "#161B22", border: "1px solid #21262D" }}>
         <div className="px-5 py-4" style={{ borderBottom: "1px solid #21262D" }}>
           <h2 className="font-semibold text-white text-sm">Historial</h2>
         </div>
-        {historial.length === 0 ? (
+        {loadingHist ? (
+          <div className="px-5 py-10 text-center text-sm" style={{ color: "#484F58" }}>
+            Cargando...
+          </div>
+        ) : historial.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm" style={{ color: "#484F58" }}>
             No hay contratos generados aún
           </div>
@@ -238,26 +306,38 @@ export default function Contratos() {
                 <th className="px-5 py-3 text-left text-xs font-medium" style={{ color: "#484F58" }}>Lugar</th>
                 <th className="px-5 py-3 text-left text-xs font-medium" style={{ color: "#484F58" }}>Fecha evento</th>
                 <th className="px-5 py-3 text-left text-xs font-medium" style={{ color: "#484F58" }}>Generado</th>
-                <th className="px-5 py-3 text-right text-xs font-medium" style={{ color: "#484F58" }}>PDF</th>
+                <th className="px-5 py-3 text-right text-xs font-medium" style={{ color: "#484F58" }}>Archivos</th>
               </tr>
             </thead>
             <tbody>
-              {historial.map((c) => (
-                <tr key={c.id} className="transition-colors" style={{ borderBottom: "1px solid #21262D22" }}>
+              {historial.map((c, i) => (
+                <tr key={c.id} style={{ borderBottom: i < historial.length - 1 ? "1px solid #21262D22" : "none" }}>
                   <td className="px-5 py-3" style={{ color: "#C9D1D9" }}>{c.nombre_prestatario}</td>
                   <td className="px-5 py-3" style={{ color: "#8B949E" }}>{c.lugar_evento}</td>
                   <td className="px-5 py-3" style={{ color: "#8B949E" }}>{c.dia_evento}</td>
                   <td className="px-5 py-3 text-xs" style={{ color: "#484F58" }}>
                     {format(new Date(c.created_at), "dd MMM yyyy HH:mm", { locale: es })}
                   </td>
-                  <td className="px-5 py-3 text-right">
-                    {c.pdf_url ? (
-                      <a href={c.pdf_url} target="_blank" rel="noreferrer" style={{ color: "#79C0FF" }} className="hover:opacity-80 transition-opacity">
-                        <Download size={15} />
-                      </a>
-                    ) : (
-                      <span style={{ color: "#484F58" }}>—</span>
-                    )}
+                  <td className="px-5 py-3">
+                    <div className="flex items-center justify-end gap-3">
+                      {c.doc_url && (
+                        <a href={c.doc_url} target="_blank" rel="noreferrer"
+                          title="Google Docs"
+                          style={{ color: "#79C0FF" }} className="hover:opacity-80 transition-opacity">
+                          <ExternalLink size={14} />
+                        </a>
+                      )}
+                      {c.pdf_url && (
+                        <a href={c.pdf_url} target="_blank" rel="noreferrer"
+                          title="PDF"
+                          style={{ color: "#79C0FF" }} className="hover:opacity-80 transition-opacity">
+                          <Download size={14} />
+                        </a>
+                      )}
+                      {!c.doc_url && !c.pdf_url && (
+                        <span style={{ color: "#484F58" }}>—</span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}

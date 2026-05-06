@@ -1,23 +1,16 @@
-import { useState, useEffect, useRef } from "react";
-import { MessageSquare, Search, Filter, RefreshCw, ChevronDown, User, Bot } from "lucide-react";
-import api from "../utils/api";
+import { useState, useEffect } from "react";
+import { MessageSquare, Search, RefreshCw, ChevronDown, User, Bot } from "lucide-react";
+import { supabase } from "../utils/supabase";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-const CHANNELS = ["todos", "web", "telegram", "whatsapp"];
-const CANAL_COLORS = { web: "#2B6BF3", telegram: "#0088cc", whatsapp: "#25D366" };
-const CANAL_LABELS = { web: "Web", telegram: "Telegram", whatsapp: "WhatsApp" };
-
-function CanalBadge({ canal }) {
-  const color = CANAL_COLORS[canal] || "#8B949E";
-  return (
-    <span
-      className="badge text-[10px] font-semibold uppercase tracking-wide"
-      style={{ background: `${color}22`, color, border: `1px solid ${color}44` }}
-    >
-      {CANAL_LABELS[canal] || canal}
-    </span>
-  );
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function parseMessage(row) {
+  // n8n guarda: { type: "human"|"ai", content: "...", data: {...} }
+  const msg = row.message ?? {};
+  const role    = msg.type === "human" ? "user" : "assistant";
+  const content = msg.data?.content ?? msg.content ?? "(vacío)";
+  return { id: row.id, session_id: row.session_id, role, content, created_at: row.created_at };
 }
 
 function ConvThread({ messages }) {
@@ -27,11 +20,14 @@ function ConvThread({ messages }) {
         <div key={m.id} className={`flex gap-2 items-start ${m.role === "user" ? "" : "flex-row-reverse"}`}>
           <div
             className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-            style={{ background: m.role === "user" ? "#21262D" : "#2B6BF322", border: `1px solid ${m.role === "user" ? "#30363D" : "#2B6BF344"}` }}
+            style={{
+              background: m.role === "user" ? "#21262D" : "#2B6BF322",
+              border: `1px solid ${m.role === "user" ? "#30363D" : "#2B6BF344"}`,
+            }}
           >
             {m.role === "user"
               ? <User size={11} className="text-[#8B949E]" />
-              : <Bot size={11} className="text-snr-400" />
+              : <Bot  size={11} style={{ color: "#2B6BF3" }} />
             }
           </div>
           <div
@@ -43,7 +39,7 @@ function ConvThread({ messages }) {
             }}
           >
             <p className="whitespace-pre-wrap">{m.content}</p>
-            <p className="text-[#484F58] text-[10px] mt-1">
+            <p className="text-[10px] mt-1" style={{ color: "#484F58" }}>
               {format(new Date(m.created_at), "HH:mm:ss", { locale: es })}
             </p>
           </div>
@@ -53,145 +49,129 @@ function ConvThread({ messages }) {
   );
 }
 
+// ── Componente principal ──────────────────────────────────────────────────────
 export default function Mensajes() {
-  const [channel, setChannel] = useState("todos");
-  const [searchKey, setSearchKey] = useState("");
-  const [messages, setMessages] = useState([]);
+  const [rows, setRows]       = useState([]);
   const [loading, setLoading] = useState(false);
+  const [search, setSearch]   = useState("");
   const [expanded, setExpanded] = useState(null);
-  const [page, setPage] = useState(0);
-  const PAGE_SIZE = 50;
 
-  async function load(reset = false) {
+  async function load() {
     setLoading(true);
-    try {
-      const params = new URLSearchParams({ limit: PAGE_SIZE, canal: channel === "todos" ? "web" : channel });
-      if (searchKey) params.append("session_key", searchKey);
-      const { data } = await api.get(`/admin/conversaciones?${params}`);
-      setMessages(data);
-    } catch {}
+    const { data } = await supabase
+      .from("n8n_chat_histories")
+      .select("id, session_id, message, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    setRows(data ?? []);
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [channel]);
+  useEffect(() => { load(); }, []);
 
-  // Agrupar mensajes por session_key
+  // Parsear y agrupar por session_id
+  const messages = rows.map(parseMessage);
   const sessions = messages.reduce((acc, m) => {
-    if (!acc[m.session_key]) acc[m.session_key] = [];
-    acc[m.session_key].push(m);
+    if (!acc[m.session_id]) acc[m.session_id] = [];
+    acc[m.session_id].push(m);
     return acc;
   }, {});
 
-  const sessionList = Object.entries(sessions).map(([key, msgs]) => ({
-    key,
-    canal: msgs[0].channel,
-    mensajes: msgs.length,
-    ultimo: msgs[msgs.length - 1]?.created_at,
-    msgs,
-  }));
+  const sessionList = Object.entries(sessions)
+    .map(([key, msgs]) => ({
+      key,
+      mensajes: msgs.length,
+      ultimo: msgs[0]?.created_at,
+      msgs: [...msgs].reverse(), // cronológico para mostrar
+    }))
+    .filter((s) => !search || s.key.includes(search));
 
   return (
     <div className="p-6 space-y-5">
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <MessageSquare size={20} className="text-snr-400" />
+            <MessageSquare size={20} style={{ color: "#2B6BF3" }} />
             Base de mensajes
           </h1>
-          <p className="text-[#8B949E] text-sm mt-0.5">Análisis de conversaciones por canal</p>
+          <p className="text-sm mt-0.5" style={{ color: "#8B949E" }}>Conversaciones del agente interno vía n8n</p>
         </div>
-        <button onClick={() => load()} className="btn-ghost flex items-center gap-2">
+        <button onClick={load} className="btn-ghost flex items-center gap-2">
           <RefreshCw size={14} />
           Actualizar
         </button>
       </div>
 
-      {/* Filtros */}
-      <div className="card p-4 flex flex-wrap items-center gap-3">
-        <div className="flex gap-1.5">
-          {CHANNELS.map((ch) => (
-            <button
-              key={ch}
-              onClick={() => { setChannel(ch); setExpanded(null); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors capitalize ${
-                channel === ch
-                  ? "text-white"
-                  : "text-[#8B949E] hover:text-white hover:bg-[#1C2230]"
-              }`}
-              style={channel === ch ? { background: ch === "todos" ? "#2B6BF3" : CANAL_COLORS[ch] } : {}}
-            >
-              {ch}
-            </button>
-          ))}
-        </div>
-        <div className="flex-1 min-w-[200px] relative">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#484F58]" />
-          <input
-            value={searchKey}
-            onChange={(e) => setSearchKey(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && load()}
-            placeholder="Buscar por session ID..."
-            className="input pl-8 text-xs h-9"
-          />
-        </div>
+      {/* Búsqueda */}
+      <div className="card p-4 flex items-center gap-3">
+        <Search size={13} className="shrink-0" style={{ color: "#484F58" }} />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Filtrar por session ID..."
+          className="flex-1 bg-transparent text-sm outline-none text-white placeholder-[#484F58]"
+        />
       </div>
 
-      {/* Stats row */}
+      {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: "Sesiones", value: sessionList.length },
-          { label: "Mensajes", value: messages.length },
+          { label: "Mensajes",  value: messages.length },
           {
-            label: "Tasa respuesta",
+            label: "Respuestas",
             value: messages.length
               ? `${Math.round((messages.filter((m) => m.role === "assistant").length / messages.length) * 100)}%`
               : "—",
           },
         ].map((s) => (
           <div key={s.label} className="card px-4 py-3 text-center">
-            <p className="text-[#8B949E] text-xs">{s.label}</p>
+            <p className="text-xs" style={{ color: "#8B949E" }}>{s.label}</p>
             <p className="text-white text-xl font-bold mt-0.5">{s.value}</p>
           </div>
         ))}
       </div>
 
-      {/* Lista de sesiones */}
+      {/* Lista */}
       {loading ? (
         <div className="space-y-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="card p-4 h-14 animate-pulse" />
-          ))}
+          {[0, 1, 2, 3].map((i) => <div key={i} className="card p-4 h-14 animate-pulse" />)}
         </div>
       ) : sessionList.length === 0 ? (
-        <div className="card p-10 text-center text-[#484F58] text-sm">
-          No hay conversaciones para este filtro
+        <div className="card p-10 text-center text-sm" style={{ color: "#484F58" }}>
+          No hay conversaciones aún
         </div>
       ) : (
         <div className="space-y-2">
           {sessionList.map((s) => (
             <div key={s.key} className="card overflow-hidden">
-              {/* Session header */}
               <button
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#1C2230] transition-colors text-left"
                 onClick={() => setExpanded(expanded === s.key ? null : s.key)}
               >
-                <CanalBadge canal={s.canal} />
+                <span
+                  className="text-xs font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: "#2B6BF322", color: "#79C0FF", border: "1px solid #2B6BF344" }}
+                >
+                  web
+                </span>
                 <span className="flex-1 text-xs text-[#8B949E] font-mono truncate">{s.key}</span>
                 <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-[#8B949E]">{s.mensajes} msgs</span>
-                  <span className="text-[10px] text-[#484F58]">
+                  <span className="text-xs" style={{ color: "#8B949E" }}>{s.mensajes} msgs</span>
+                  <span className="text-[10px]" style={{ color: "#484F58" }}>
                     {s.ultimo ? format(new Date(s.ultimo), "dd/MM HH:mm", { locale: es }) : ""}
                   </span>
                   <ChevronDown
                     size={14}
-                    className={`text-[#484F58] transition-transform ${expanded === s.key ? "rotate-180" : ""}`}
+                    style={{ color: "#484F58" }}
+                    className={`transition-transform ${expanded === s.key ? "rotate-180" : ""}`}
                   />
                 </div>
               </button>
-              {/* Thread */}
               {expanded === s.key && (
-                <div className="px-4 pb-4 pt-2 border-t border-[#21262D] bg-[#0D1117]">
+                <div className="px-4 pb-4 pt-2" style={{ borderTop: "1px solid #21262D", background: "#0D1117" }}>
                   <ConvThread messages={s.msgs} />
                 </div>
               )}

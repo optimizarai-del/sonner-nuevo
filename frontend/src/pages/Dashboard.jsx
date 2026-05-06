@@ -1,23 +1,9 @@
 import { useState, useEffect } from "react";
-import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
-import {
-  MessageSquare, Users, FileText, Database,
-  TrendingUp, Activity, Zap, Globe,
-} from "lucide-react";
-import api from "../utils/api";
-import { format } from "date-fns";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { MessageSquare, FileText, Shield, Activity, TrendingUp, RefreshCw } from "lucide-react";
+import { supabase } from "../utils/supabase";
+import { format, subDays, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
-
-const CANAL_COLORS = {
-  web: "#2B6BF3",
-  telegram: "#0088cc",
-  whatsapp: "#25D366",
-};
-
-const CANAL_LABELS = { web: "Web", telegram: "Telegram", whatsapp: "WhatsApp" };
 
 function KpiCard({ icon: Icon, label, value, sub, color = "#2B6BF3" }) {
   return (
@@ -29,9 +15,9 @@ function KpiCard({ icon: Icon, label, value, sub, color = "#2B6BF3" }) {
         <Icon size={18} style={{ color }} />
       </div>
       <div>
-        <p className="text-[#8B949E] text-xs font-medium mb-1">{label}</p>
+        <p className="text-xs font-medium mb-1" style={{ color: "#8B949E" }}>{label}</p>
         <p className="text-white text-2xl font-bold">{value ?? "—"}</p>
-        {sub && <p className="text-[#8B949E] text-xs mt-1">{sub}</p>}
+        {sub && <p className="text-xs mt-1" style={{ color: "#8B949E" }}>{sub}</p>}
       </div>
     </div>
   );
@@ -40,11 +26,12 @@ function KpiCard({ icon: Icon, label, value, sub, color = "#2B6BF3" }) {
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#161B22] border border-[#21262D] rounded-lg px-3 py-2 text-sm shadow-xl">
-      <p className="text-[#8B949E] mb-1">{label}</p>
+    <div className="rounded-lg px-3 py-2 text-sm shadow-xl"
+      style={{ background: "#161B22", border: "1px solid #21262D" }}>
+      <p className="mb-1" style={{ color: "#8B949E" }}>{label}</p>
       {payload.map((p) => (
         <p key={p.dataKey} style={{ color: p.color }} className="font-medium">
-          {CANAL_LABELS[p.dataKey] || p.dataKey}: {p.value}
+          {p.name}: {p.value}
         </p>
       ))}
     </div>
@@ -52,93 +39,82 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 export default function Dashboard() {
-  const [overview, setOverview] = useState(null);
-  const [daily, setDaily] = useState([]);
-  const [active, setActive] = useState([]);
+  const [stats, setStats]   = useState(null);
+  const [chart, setChart]   = useState([]);
+  const [recent, setRecent] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function load() {
     setLoading(true);
     try {
-      const [ov, dy, ac] = await Promise.all([
-        api.get("/metrics/overview"),
-        api.get("/metrics/mensajes-por-dia?dias=30"),
-        api.get("/metrics/sesiones-activas"),
+      const now = new Date();
+      const mesInicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const hace30    = subDays(now, 30).toISOString();
+
+      const [
+        { count: totalContratos },
+        { count: mesContratos },
+        { count: totalBloqueados },
+        { count: totalMensajes },
+        { data: chatsRecientes },
+        { data: contratosRecientes },
+      ] = await Promise.all([
+        supabase.from("contratos").select("*", { count: "exact", head: true }),
+        supabase.from("contratos").select("*", { count: "exact", head: true }).gte("created_at", mesInicio),
+        supabase.from("blocklist").select("*", { count: "exact", head: true }),
+        supabase.from("n8n_chat_histories").select("*", { count: "exact", head: true }),
+        supabase.from("n8n_chat_histories").select("created_at").gte("created_at", hace30).order("created_at"),
+        supabase.from("contratos").select("nombre_prestatario, lugar_evento, dia_evento, created_at").order("created_at", { ascending: false }).limit(5),
       ]);
-      setOverview(ov.data);
-      // Pivot daily data por canal
-      const map = {};
-      for (const r of dy.data) {
-        if (!map[r.dia]) map[r.dia] = { dia: r.dia };
-        map[r.dia][r.canal] = r.total;
+
+      setStats({
+        contratos: { total: totalContratos ?? 0, mes: mesContratos ?? 0 },
+        mensajes:  totalMensajes ?? 0,
+        bloqueados: totalBloqueados ?? 0,
+      });
+
+      // Agrupar chats por día
+      const byDay = {};
+      for (let i = 0; i < 30; i++) {
+        const d = format(subDays(now, 29 - i), "dd/MM");
+        byDay[d] = 0;
       }
-      setDaily(Object.values(map).sort((a, b) => a.dia.localeCompare(b.dia)));
-      setActive(ac.data);
-    } catch {}
+      for (const row of (chatsRecientes ?? [])) {
+        const d = format(new Date(row.created_at), "dd/MM");
+        if (d in byDay) byDay[d]++;
+      }
+      setChart(Object.entries(byDay).map(([dia, mensajes]) => ({ dia, mensajes })));
+      setRecent(contratosRecientes ?? []);
+
+    } catch (e) {
+      console.warn("[Dashboard]", e);
+    }
     setLoading(false);
   }
 
   useEffect(() => { load(); }, []);
 
-  const kpis = overview
-    ? [
-        {
-          icon: MessageSquare,
-          label: "Mensajes totales",
-          value: overview.mensajes.total.toLocaleString(),
-          sub: `${overview.mensajes.semana} esta semana`,
-          color: "#2B6BF3",
-        },
-        {
-          icon: Users,
-          label: "Sesiones únicas",
-          value: overview.sesiones.unicas.toLocaleString(),
-          sub: "Usuarios distintos",
-          color: "#58A6FF",
-        },
-        {
-          icon: FileText,
-          label: "Contratos generados",
-          value: overview.contratos.total.toLocaleString(),
-          sub: `${overview.contratos.mes} este mes`,
-          color: "#3FB950",
-        },
-        {
-          icon: Database,
-          label: "Documentos en memoria",
-          value: overview.memoria.total_docs.toLocaleString(),
-          sub: `${overview.memoria.por_fuente.length} fuentes`,
-          color: "#D29922",
-        },
-      ]
-    : [];
-
-  const canalesData = overview?.por_canal.map((c) => ({
-    name: CANAL_LABELS[c.canal] || c.canal,
-    value: c.total,
-    color: CANAL_COLORS[c.canal] || "#8B949E",
-  })) || [];
-
-  const memoriaData = overview?.memoria.por_fuente.map((f) => ({
-    name: f.fuente.replace("_", " "),
-    value: f.total,
-  })) || [];
-
-  const FUENTE_COLORS = ["#2B6BF3", "#58A6FF", "#3FB950"];
+  const kpis = stats ? [
+    { icon: FileText,      label: "Contratos generados",  value: stats.contratos.total, sub: `${stats.contratos.mes} este mes`,       color: "#3FB950" },
+    { icon: MessageSquare, label: "Mensajes procesados",   value: stats.mensajes,        sub: "Total histórico",                        color: "#2B6BF3" },
+    { icon: Shield,        label: "Contactos bloqueados",  value: stats.bloqueados,      sub: "Lista de bloqueo agente externo",         color: "#F85149" },
+    { icon: Activity,      label: "Agentes activos",       value: 2,                     sub: "Chat interno · Agente externo",           color: "#D29922" },
+  ] : [];
 
   return (
     <div className="p-6 space-y-6">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Activity size={20} className="text-snr-400" />
+            <Activity size={20} style={{ color: "#2B6BF3" }} />
             Dashboard
           </h1>
-          <p className="text-[#8B949E] text-sm mt-0.5">Métricas en tiempo real de agentes internos y externos</p>
+          <p className="text-sm mt-0.5" style={{ color: "#8B949E" }}>Resumen de actividad</p>
         </div>
         <button onClick={load} className="btn-ghost flex items-center gap-2 text-xs">
-          <TrendingUp size={14} />
+          <RefreshCw size={14} />
           Actualizar
         </button>
       </div>
@@ -147,7 +123,7 @@ export default function Dashboard() {
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="card p-5 h-24 animate-pulse bg-[#161B22]" />
+            <div key={i} className="card p-5 h-24 animate-pulse" style={{ background: "#161B22" }} />
           ))}
         </div>
       ) : (
@@ -156,138 +132,53 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Charts row 1 */}
+      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Mensajes por día */}
+
+        {/* Mensajes últimos 30 días */}
         <div className="lg:col-span-2 card p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Zap size={14} className="text-snr-400" />
+            <TrendingUp size={14} style={{ color: "#2B6BF3" }} />
             Mensajes por día (30 días)
           </h2>
-          <ResponsiveContainer width="100%" height={220}>
-            <AreaChart data={daily} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={chart} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
               <defs>
-                {Object.entries(CANAL_COLORS).map(([k, c]) => (
-                  <linearGradient key={k} id={`grad-${k}`} x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={c} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={c} stopOpacity={0} />
-                  </linearGradient>
-                ))}
+                <linearGradient id="gradMsg" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#2B6BF3" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#2B6BF3" stopOpacity={0}   />
+                </linearGradient>
               </defs>
-              <XAxis
-                dataKey="dia"
-                tick={{ fill: "#484F58", fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(d) => {
-                  try { return format(new Date(d), "dd/MM"); } catch { return d; }
-                }}
-              />
+              <XAxis dataKey="dia" tick={{ fill: "#484F58", fontSize: 10 }} tickLine={false} axisLine={false} interval={4} />
               <YAxis tick={{ fill: "#484F58", fontSize: 10 }} tickLine={false} axisLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              {Object.entries(CANAL_COLORS).map(([canal, color]) => (
-                <Area
-                  key={canal}
-                  type="monotone"
-                  dataKey={canal}
-                  stroke={color}
-                  strokeWidth={2}
-                  fill={`url(#grad-${canal})`}
-                  dot={false}
-                />
-              ))}
+              <Area type="monotone" dataKey="mensajes" name="Mensajes" stroke="#2B6BF3" strokeWidth={2} fill="url(#gradMsg)" dot={false} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
 
-        {/* Distribución por canal */}
+        {/* Últimos contratos */}
         <div className="card p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Globe size={14} className="text-snr-400" />
-            Mensajes por canal
+            <FileText size={14} style={{ color: "#3FB950" }} />
+            Últimos contratos
           </h2>
-          <ResponsiveContainer width="100%" height={160}>
-            <PieChart>
-              <Pie data={canalesData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" paddingAngle={3}>
-                {canalesData.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(v, n) => [v, n]}
-                contentStyle={{ background: "#161B22", border: "1px solid #21262D", borderRadius: 8 }}
-                labelStyle={{ color: "#8B949E" }}
-                itemStyle={{ color: "#E6EDF3" }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="space-y-1.5 mt-2">
-            {canalesData.map((c) => (
-              <div key={c.name} className="flex items-center justify-between text-xs">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full" style={{ background: c.color }} />
-                  <span className="text-[#8B949E]">{c.name}</span>
-                </span>
-                <span className="text-white font-medium">{c.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Charts row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Memoria por fuente */}
-        <div className="card p-5">
-          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Database size={14} className="text-snr-400" />
-            Memoria vectorial por fuente
-          </h2>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={memoriaData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <XAxis dataKey="name" tick={{ fill: "#484F58", fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis tick={{ fill: "#484F58", fontSize: 10 }} tickLine={false} axisLine={false} />
-              <Tooltip
-                contentStyle={{ background: "#161B22", border: "1px solid #21262D", borderRadius: 8 }}
-                itemStyle={{ color: "#E6EDF3" }}
-                cursor={{ fill: "#1C2230" }}
-              />
-              <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                {memoriaData.map((_, i) => (
-                  <Cell key={i} fill={FUENTE_COLORS[i % FUENTE_COLORS.length]} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Sesiones activas */}
-        <div className="card p-5">
-          <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <Activity size={14} className="text-snr-400" />
-            Sesiones activas (últimas 24h)
-          </h2>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
-            {active.length === 0 && (
-              <p className="text-[#484F58] text-sm text-center py-6">Sin actividad reciente</p>
+          <div className="space-y-3">
+            {recent.length === 0 ? (
+              <p className="text-xs text-center py-4" style={{ color: "#484F58" }}>Sin contratos aún</p>
+            ) : (
+              recent.map((c) => (
+                <div key={c.created_at + c.nombre_prestatario} className="flex flex-col gap-0.5">
+                  <p className="text-sm font-medium text-white truncate">{c.nombre_prestatario}</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs truncate" style={{ color: "#8B949E" }}>{c.lugar_evento}</p>
+                    <p className="text-xs shrink-0 ml-2" style={{ color: "#484F58" }}>
+                      {format(new Date(c.created_at), "dd/MM", { locale: es })}
+                    </p>
+                  </div>
+                </div>
+              ))
             )}
-            {active.map((s, i) => (
-              <div key={i} className="flex items-center justify-between bg-[#0D1117] border border-[#21262D] rounded-lg px-3 py-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span
-                    className="w-2 h-2 rounded-full shrink-0"
-                    style={{ background: CANAL_COLORS[s.canal] || "#8B949E" }}
-                  />
-                  <span className="text-xs text-[#8B949E] truncate">{s.session_key.slice(0, 24)}</span>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-white font-medium">{s.mensajes} msgs</span>
-                  <span className="badge text-[10px]" style={{ background: `${CANAL_COLORS[s.canal]}22`, color: CANAL_COLORS[s.canal] || "#8B949E" }}>
-                    {CANAL_LABELS[s.canal] || s.canal}
-                  </span>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </div>
