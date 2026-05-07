@@ -25,8 +25,9 @@ export default function Admin() {
 
   async function load() {
     setLoading(true);
+    // Lee mensajes EXTERNOS (agente WhatsApp). El interno NO se muestra.
     const { data } = await supabase
-      .from("n8n_chat_histories")
+      .from("external_chat_histories")
       .select("id, session_id, message")
       .order("id", { ascending: false })
       .limit(1000);
@@ -57,7 +58,7 @@ export default function Admin() {
     <div className="p-6 max-w-4xl mx-auto">
       <div className="mb-6">
         <h1 className="text-xl font-bold text-white">Panel de administración</h1>
-        <p className="text-sm mt-0.5" style={{ color: "#484F58" }}>Historial de conversaciones del agente</p>
+        <p className="text-sm mt-0.5" style={{ color: "#484F58" }}>Historial de conversaciones del agente externo</p>
       </div>
 
       {/* Toolbar */}

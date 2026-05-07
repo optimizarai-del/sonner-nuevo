@@ -62,8 +62,10 @@ export default function Dashboard() {
         supabase.from("contratos").select("*", { count: "exact", head: true }),
         supabase.from("contratos").select("*", { count: "exact", head: true }).gte("created_at", mesInicio),
         supabase.from("blocklist").select("*", { count: "exact", head: true }),
-        supabase.from("n8n_chat_histories").select("*", { count: "exact", head: true }),
-        supabase.from("n8n_chat_histories").select("created_at").gte("created_at", hace30).order("created_at"),
+        // Mensajes EXTERNOS (agente WhatsApp)
+        supabase.from("external_chat_histories").select("*", { count: "exact", head: true }),
+        // Volumen por día desde whatsapp_messages
+        supabase.from("whatsapp_messages").select("created_at").gte("created_at", hace30).order("created_at"),
         supabase.from("contratos").select("nombre_prestatario, lugar_evento, dia_evento, created_at").order("created_at", { ascending: false }).limit(5),
       ]);
 
@@ -96,7 +98,7 @@ export default function Dashboard() {
 
   const kpis = stats ? [
     { icon: FileText,      label: "Contratos generados",  value: stats.contratos.total, sub: `${stats.contratos.mes} este mes`,       color: "#3FB950" },
-    { icon: MessageSquare, label: "Mensajes procesados",   value: stats.mensajes,        sub: "Total histórico",                        color: "#2B6BF3" },
+    { icon: MessageSquare, label: "Mensajes externos",      value: stats.mensajes,        sub: "Memoria del agente WhatsApp",            color: "#25D366" },
     { icon: Shield,        label: "Contactos bloqueados",  value: stats.bloqueados,      sub: "Lista de bloqueo agente externo",         color: "#F85149" },
     { icon: Activity,      label: "Agentes activos",       value: 2,                     sub: "Chat interno · Agente externo",           color: "#D29922" },
   ] : [];
