@@ -6,7 +6,7 @@ import { es } from "date-fns/locale";
 
 // Backend Python — genera Doc + PDF + guarda en Supabase
 const CONTRATOS_API = import.meta.env.VITE_CONTRATOS_API
-  || "https://contratos-sonner.optimizar-ia.com";
+  || "https://backend-sonner.optimizar-ia.com";
 
 // ── Valores vacíos del formulario ─────────────────────────────────────────────
 const EMPTY = {
