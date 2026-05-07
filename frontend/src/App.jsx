@@ -4,11 +4,10 @@ import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import Crm from "./pages/Crm";
 import Whatsapp from "./pages/Whatsapp";
-import Mensajes from "./pages/Mensajes";
 import Analista from "./pages/Analista";
 import Contratos from "./pages/Contratos";
 import Telegram from "./pages/Telegram";
-import Admin from "./pages/Admin";
+import Configuracion from "./pages/Configuracion";
 import Login from "./pages/Login";
 
 function RequireAuth({ children }) {
@@ -29,16 +28,15 @@ export default function App() {
             </RequireAuth>
           }
         >
-          <Route index            element={<Navigate to="/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="crm"       element={<Crm />} />
-          <Route path="chat"      element={<Chat />} />
-          <Route path="whatsapp"  element={<Whatsapp />} />
-          <Route path="contratos" element={<Contratos />} />
-          <Route path="mensajes"  element={<Mensajes />} />
-          <Route path="analista"  element={<Analista />} />
-          <Route path="telegram"  element={<Telegram />} />
-          <Route path="admin"     element={<Admin />} />
+          <Route index               element={<Navigate to="/dashboard" replace />} />
+          <Route path="dashboard"    element={<Dashboard />} />
+          <Route path="crm"          element={<Crm />} />
+          <Route path="chat"         element={<Chat />} />
+          <Route path="whatsapp"     element={<Whatsapp />} />
+          <Route path="contratos"    element={<Contratos />} />
+          <Route path="analista"     element={<Analista />} />
+          <Route path="telegram"     element={<Telegram />} />
+          <Route path="configuracion" element={<Configuracion />} />
         </Route>
       </Routes>
     </BrowserRouter>

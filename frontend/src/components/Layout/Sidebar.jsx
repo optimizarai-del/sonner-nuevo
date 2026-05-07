@@ -14,15 +14,14 @@ const TgIcon = () => (
 );
 
 const NAV = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/crm",       icon: Users,           label: "CRM" },
-  { to: "/chat",      icon: MessageSquare,   label: "Chat interno" },
-  { to: "/whatsapp",  icon: WaIcon,          label: "WhatsApp" },
-  { to: "/contratos", icon: FileText,        label: "Contratos" },
-  { to: "/mensajes",  icon: Send,            label: "Mensajes" },
-  { to: "/analista",  icon: Brain,           label: "Analista IA" },
-  { to: "/telegram",  icon: TgIcon,          label: "Agente externo" },
-  { to: "/admin",     icon: Settings,        label: "Admin" },
+  { to: "/dashboard",     icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/crm",           icon: Users,           label: "CRM" },
+  { to: "/chat",          icon: MessageSquare,   label: "Chat interno" },
+  { to: "/whatsapp",      icon: WaIcon,          label: "WhatsApp" },
+  { to: "/contratos",     icon: FileText,        label: "Contratos" },
+  { to: "/analista",      icon: Brain,           label: "Analista IA" },
+  { to: "/telegram",      icon: TgIcon,          label: "Agente externo" },
+  { to: "/configuracion", icon: Settings,        label: "Configuración" },
 ];
 
 export default function Sidebar() {
