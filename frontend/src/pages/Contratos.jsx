@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { FileText, Download, ExternalLink, Plus, X, Check, AlertCircle, Loader2 } from "lucide-react";
 import { supabase } from "../utils/supabase";
-import { WEBHOOKS, callWebhook } from "../utils/n8n";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+// Backend Python — genera Doc + PDF + guarda en Supabase
+const CONTRATOS_API = import.meta.env.VITE_CONTRATOS_API
+  || "https://contratos-sonner.optimizar-ia.com";
 
 // ── Valores vacíos del formulario ─────────────────────────────────────────────
 const EMPTY = {
@@ -87,34 +90,23 @@ export default function Contratos() {
     };
 
     try {
-      // 1. n8n copia el template, rellena placeholders, exporta PDF → devuelve URLs
-      const data = await callWebhook(WEBHOOKS.contratos, payload);
+      // 1. Backend Python: copia template, rellena, exporta PDF, guarda en Supabase
+      const res = await fetch(`${CONTRATOS_API}/api/contratos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+      }
+      const data = await res.json();
 
-      const doc_url = data?.doc_url  ?? data?.google_doc_url ?? data?.docUrl ?? null;
-      const pdf_url = data?.pdf_url  ?? data?.pdf            ?? data?.pdfUrl ?? null;
+      const doc_url = data?.doc_url ?? null;
+      const pdf_url = data?.pdf_url ?? null;
 
       // 2. Guardar en Supabase para historial
-      await supabase.from("contratos").insert({
-        nombre_prestatario:     payload.nombre_prestatario,
-        dni_prestatario:        payload.DNI_prestatario,
-        domicilio_prestatario:  payload.domicilio_prestatario,
-        lugar_evento:           payload.lugar_evento,
-        dia_evento:             payload.dia_evento,
-        hora_inicio:            payload.hora_inicio,
-        hora_fin:               payload.hora_fin,
-        dias_para_pagar:        payload.dias_para_pagar,
-        valor_total_prestacion: payload.valor_total_prestacion,
-        equipamientos:          payload.equipamientos,
-        monto_total_pesos:      payload.monto_total_pesos,
-        monto_total_reserva:    payload.monto_total_reserva,
-        saldo_a_cancelar:       payload.saldo_a_cancelar,
-        dia_firma:              payload.dia_firma,
-        mes_firma:              payload.mes_firma,
-        anio_firma:             payload.año_firma,
-        doc_url,
-        pdf_url,
-      });
-
+      // El backend ya guardó el registro en Supabase, no duplicamos.
       setResult({ doc_url, pdf_url });
       setForm(EMPTY);
       setShowForm(false);
