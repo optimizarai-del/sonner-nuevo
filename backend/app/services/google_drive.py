@@ -64,22 +64,37 @@ def generar_contrato(form: dict[str, Any]) -> dict[str, str]:
     ).execute()
     doc_id = copia["id"]
 
-    # 2. Reemplazar placeholders
-    requests_body = []
-    for key in [
+    # 2. Reemplazar placeholders.
+    # El template usa paréntesis: (variable). Mayúsculas/minúsculas case-sensitive.
+    placeholders = [
         "nombre_prestatario", "DNI_prestatario", "domicilio_prestatario",
-        "lugar_evento", "dia_evento", "hora_inicio", "hora_fin",
-        "dias_para_pagar", "valor_total_prestacion", "equipamientos",
+        "lugar_evento", "dia_evento", "dia_finevento", "hora_inicio", "hora_fin",
+        "dias_para_pagar", "valor_total_prestacion", "Equipamientos",
         "monto_total_pesos", "monto_total_reserva", "saldo_a_cancelar",
         "dia_firma", "mes_firma", "año_firma",
-    ]:
-        valor = form.get(key, "")
-        # Convertir int a str (por los montos)
-        if isinstance(valor, (int, float)):
-            valor = f"{int(valor):,}".replace(",", ".")  # formato AR
+    ]
+    # Aliases: el form puede traer las keys en otra capitalización
+    aliases = {
+        "Equipamientos":   ["Equipamientos", "equipamientos"],
+        "DNI_prestatario": ["DNI_prestatario", "dni_prestatario"],
+        "año_firma":       ["año_firma", "anio_firma", "ano_firma"],
+    }
+    money_keys = {"valor_total_prestacion", "monto_total_pesos",
+                  "monto_total_reserva", "saldo_a_cancelar"}
+
+    requests_body = []
+    for key in placeholders:
+        valor: Any = ""
+        for alias in aliases.get(key, [key]):
+            if alias in form and form[alias] not in (None, ""):
+                valor = form[alias]
+                break
+        # Formato AR para montos
+        if key in money_keys and isinstance(valor, (int, float)):
+            valor = f"$ {int(valor):,}".replace(",", ".")
         requests_body.append({
             "replaceAllText": {
-                "containsText": {"text": "{{" + key + "}}", "matchCase": True},
+                "containsText": {"text": "(" + key + ")", "matchCase": True},
                 "replaceText": str(valor),
             }
         })

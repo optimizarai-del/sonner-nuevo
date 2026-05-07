@@ -21,6 +21,7 @@ def insertar_contrato(form: dict, urls: dict) -> dict | None:
         "domicilio_prestatario":  form.get("domicilio_prestatario"),
         "lugar_evento":           form.get("lugar_evento"),
         "dia_evento":             form.get("dia_evento"),
+        "dia_finevento":          form.get("dia_finevento"),
         "hora_inicio":            form.get("hora_inicio"),
         "hora_fin":               form.get("hora_fin"),
         "dias_para_pagar":        form.get("dias_para_pagar"),

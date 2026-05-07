@@ -18,6 +18,7 @@ class ContratoIn(BaseModel):
     domicilio_prestatario:  str
     lugar_evento:           str
     dia_evento:             str
+    dia_finevento:          str = ""           # NUEVO
     hora_inicio:            str
     hora_fin:               str
     dias_para_pagar:        str
@@ -28,7 +29,7 @@ class ContratoIn(BaseModel):
     saldo_a_cancelar:       int = 0
     dia_firma:              str
     mes_firma:              str
-    año_firma:              str = Field(..., alias="año_firma")
+    año_firma:              str
 
     model_config = {"populate_by_name": True}
 
