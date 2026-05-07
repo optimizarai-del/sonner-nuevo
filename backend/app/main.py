@@ -1,43 +1,36 @@
-from contextlib import asynccontextmanager
+"""FastAPI app para Contratos Sonner."""
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-from pathlib import Path
 
-# .env está en la raíz del proyecto (2 niveles arriba de app/main.py)
-_env_path = Path(__file__).parent.parent.parent / ".env"
-load_dotenv(_env_path if _env_path.exists() else ".env")
+from .config import settings
+from .routers import contratos
 
-from .database import create_tables
-from .routers import contratos, chat_web, telegram_webhook, telegram_externo_webhook, whatsapp_webhook, admin, metrics, analyst
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await create_tables()
-    yield
-
-
-app = FastAPI(title="Sonner API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(
+    title="Sonner — Contratos API",
+    version="1.0.0",
+    description="Genera contratos vía Google Docs + PDF y los guarda en Supabase.",
+)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 app.include_router(contratos.router)
-app.include_router(chat_web.router)
-app.include_router(telegram_webhook.router)
-app.include_router(telegram_externo_webhook.router)
-app.include_router(whatsapp_webhook.router)
-app.include_router(admin.router)
-app.include_router(metrics.router)
-app.include_router(analyst.router)
 
 
-@app.get("/health")
-async def health():
-    return {"status": "ok", "service": "sonner-api"}
+@app.get("/")
+def root() -> dict[str, str]:
+    return {"service": "contratos-api", "status": "running"}
+
+
+@app.on_event("startup")
+def _on_startup() -> None:
+    logger.info("Contratos API arrancada — CORS origins: %s", settings.cors_origins_list)
