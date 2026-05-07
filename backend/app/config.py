@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = "https://wndfjicwzmsuxxcsnccl.supabase.co"
     SUPABASE_ANON_KEY: str
 
+    # ── Anthropic (Analista IA) ───────────────────────────────────────────────
+    ANTHROPIC_API_KEY: str = ""
+    ANTHROPIC_MODEL: str = "claude-haiku-4-5-20251001"
+
     # ── CORS ──────────────────────────────────────────────────────────────────
     # Orígenes permitidos separados por coma
     CORS_ORIGINS: str = "https://sonner.optimizar-ia.com,http://localhost:5180,http://localhost:5173"

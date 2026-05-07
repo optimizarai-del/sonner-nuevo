@@ -1,18 +1,18 @@
-"""FastAPI app para Contratos Sonner."""
+"""FastAPI app del backend de Sonner — contratos + analista IA."""
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import contratos
+from .routers import contratos, analista
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
-    title="Sonner — Contratos API",
-    version="1.0.0",
-    description="Genera contratos vía Google Docs + PDF y los guarda en Supabase.",
+    title="Sonner — Backend",
+    version="1.1.0",
+    description="Contratos (Google Docs + PDF) y Analista IA con tools sobre Supabase.",
 )
 
 app.add_middleware(
@@ -24,13 +24,14 @@ app.add_middleware(
 )
 
 app.include_router(contratos.router)
+app.include_router(analista.router)
 
 
 @app.get("/")
 def root() -> dict[str, str]:
-    return {"service": "contratos-api", "status": "running"}
+    return {"service": "sonner-backend", "status": "running"}
 
 
 @app.on_event("startup")
 def _on_startup() -> None:
-    logger.info("Contratos API arrancada — CORS origins: %s", settings.cors_origins_list)
+    logger.info("Sonner backend arrancado — CORS origins: %s", settings.cors_origins_list)

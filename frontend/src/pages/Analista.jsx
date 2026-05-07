@@ -1,14 +1,16 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Brain, User, Sparkles } from "lucide-react";
-import { WEBHOOKS, callWebhook, extractText } from "../utils/n8n";
+
+const ANALISTA_API = import.meta.env.VITE_CONTRATOS_API
+  || "https://backend-sonner.optimizar-ia.com";
 
 const SUGGESTIONS = [
   "¿Cuántos contratos se generaron este mes?",
-  "¿Cuál es el canal más activo?",
-  "¿Cuáles fueron las consultas más frecuentes?",
-  "¿Hay patrones en los horarios de mayor actividad?",
+  "¿Cuánto facturé en contratos este mes?",
+  "¿Cuáles son los contactos más activos en WhatsApp?",
   "Resumí la actividad de la última semana",
-  "¿Qué temas se consultan más?",
+  "¿Cómo está mi pipeline de CRM?",
+  "¿Cuál es la tasa de respuesta del agente externo?",
 ];
 
 function Message({ msg }) {
@@ -85,11 +87,24 @@ export default function Analista() {
     setLoading(true);
 
     try {
-      const data = await callWebhook(WEBHOOKS.analista, { question: q });
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 90_000);
+      const res = await fetch(`${ANALISTA_API}/api/analista`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: q }),
+        signal: ctrl.signal,
+      });
+      clearTimeout(tid);
+      if (!res.ok) {
+        const errBody = await res.text();
+        throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 300)}`);
+      }
+      const data = await res.json();
       setMessages((prev) => [...prev, {
         id: Date.now(),
         role: "assistant",
-        content: extractText(data),
+        content: data?.output ?? "Sin respuesta",
       }]);
     } catch (err) {
       setMessages((prev) => [...prev, {
@@ -97,7 +112,7 @@ export default function Analista() {
         role: "assistant",
         content: err.name === "AbortError"
           ? "La consulta tardó demasiado. Intentá de nuevo."
-          : "Error al consultar el analista. Verificá que el webhook esté activo.",
+          : `Error al consultar el analista: ${err.message || ""}`,
       }]);
     } finally {
       setLoading(false);
@@ -121,7 +136,7 @@ export default function Analista() {
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
           style={{ background: "#0D1B38", border: "1px solid #1e3a6e" }}>
           <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: "#2B6BF3" }} />
-          <span className="text-[10px] font-medium" style={{ color: "#79C0FF" }}>n8n agent</span>
+          <span className="text-[10px] font-medium" style={{ color: "#79C0FF" }}>Claude · Supabase tools</span>
         </div>
       </div>
 
