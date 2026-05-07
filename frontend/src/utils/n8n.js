@@ -22,7 +22,9 @@ export async function callWebhook(url, body, timeoutMs = 90_000) {
     });
     clearTimeout(tid);
     if (!res.ok) throw new Error(`n8n respondió ${res.status}`);
-    return await res.json();
+    // n8n puede devolver JSON o texto plano según cómo esté el "Respond to Webhook"
+    const raw = await res.text();
+    try { return JSON.parse(raw); } catch { return raw; }
   } catch (err) {
     clearTimeout(tid);
     throw err;

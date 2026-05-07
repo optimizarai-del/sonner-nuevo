@@ -131,13 +131,18 @@ export default function Chat() {
 
       if (!res.ok) throw new Error(`n8n respondió ${res.status}`);
 
-      const data = await res.json();
-
-      // n8n puede devolver: { output: "..." } o { text: "..." } o string directo
-      const reply =
-        typeof data === "string"
+      // n8n puede devolver: { output: "..." }, { text: "..." }, o texto plano
+      const raw = await res.text();
+      let reply;
+      try {
+        const data = JSON.parse(raw);
+        reply = typeof data === "string"
           ? data
           : data.output ?? data.text ?? data.message ?? data.reply ?? JSON.stringify(data);
+      } catch {
+        // No es JSON, asumimos texto plano
+        reply = raw;
+      }
 
       setMessages((prev) => [
         ...prev,
