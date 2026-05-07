@@ -1,14 +1,20 @@
 import { useState, useEffect } from "react";
 import { MessageSquare, RefreshCw, ChevronDown } from "lucide-react";
 import { supabase } from "../utils/supabase";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 
 function parseMessage(row) {
+  // n8n_chat_histories tiene esquema mínimo: id, session_id, message (sin created_at)
   const msg = row.message ?? {};
-  const role    = msg.type === "human" ? "user" : "assistant";
-  const content = msg.data?.content ?? msg.content ?? "(vacío)";
-  return { id: row.id, session_id: row.session_id, role, content, created_at: row.created_at };
+  const role = msg.type === "human" ? "user" : "assistant";
+  let content = msg.data?.content ?? msg.content ?? "(vacío)";
+  // Agente devuelve JSON anidado: {"output":{"respuesta":"..."}}
+  if (typeof content === "string" && content.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(content);
+      content = parsed.output?.respuesta ?? parsed.respuesta ?? (typeof parsed.output === "string" ? parsed.output : null) ?? content;
+    } catch {}
+  }
+  return { id: row.id, session_id: row.session_id, role, content };
 }
 
 export default function Admin() {
@@ -21,9 +27,9 @@ export default function Admin() {
     setLoading(true);
     const { data } = await supabase
       .from("n8n_chat_histories")
-      .select("id, session_id, message, created_at")
-      .order("created_at", { ascending: false })
-      .limit(500);
+      .select("id, session_id, message")
+      .order("id", { ascending: false })
+      .limit(1000);
     setRows(data ?? []);
     setLoading(false);
   }
@@ -41,9 +47,10 @@ export default function Admin() {
     .map(([key, msgs]) => ({
       key,
       mensajes: msgs.length,
-      ultimo: msgs[0]?.created_at,
+      ultimoId: msgs[0]?.id,
       msgs: [...msgs].reverse(),
     }))
+    .sort((a, b) => (b.ultimoId ?? 0) - (a.ultimoId ?? 0))
     .filter((s) => !search || s.key.toLowerCase().includes(search.toLowerCase()));
 
   return (
@@ -108,7 +115,7 @@ export default function Admin() {
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-xs" style={{ color: "#8B949E" }}>{s.mensajes} msgs</span>
                   <span className="text-[10px]" style={{ color: "#484F58" }}>
-                    {s.ultimo ? format(new Date(s.ultimo), "dd/MM HH:mm", { locale: es }) : ""}
+                    #{s.ultimoId}
                   </span>
                   <ChevronDown
                     size={14}
@@ -133,9 +140,7 @@ export default function Admin() {
                           style={{ color: m.role === "user" ? "#79C0FF" : "#3fb950" }}>
                           {m.role === "user" ? "Usuario" : "Agente"}
                         </span>
-                        <span className="text-xs" style={{ color: "#484F58" }}>
-                          {format(new Date(m.created_at), "HH:mm:ss", { locale: es })}
-                        </span>
+                        <span className="text-xs" style={{ color: "#484F58" }}>#{m.id}</span>
                       </div>
                       <p className="whitespace-pre-wrap leading-relaxed" style={{ color: "#C9D1D9" }}>
                         {m.content}

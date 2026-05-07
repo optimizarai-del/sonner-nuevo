@@ -7,10 +7,18 @@ import { es } from "date-fns/locale";
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function parseMessage(row) {
   // n8n guarda: { type: "human"|"ai", content: "...", data: {...} }
+  // El esquema mínimo de n8n NO tiene created_at, solo id (bigserial autoincremental)
   const msg = row.message ?? {};
-  const role    = msg.type === "human" ? "user" : "assistant";
-  const content = msg.data?.content ?? msg.content ?? "(vacío)";
-  return { id: row.id, session_id: row.session_id, role, content, created_at: row.created_at };
+  const role = msg.type === "human" ? "user" : "assistant";
+  let content = msg.data?.content ?? msg.content ?? "(vacío)";
+  // El agente devuelve JSON en string: {"output":{"respuesta":"...","comando":"..."}}
+  if (typeof content === "string" && content.trim().startsWith("{")) {
+    try {
+      const parsed = JSON.parse(content);
+      content = parsed.output?.respuesta ?? parsed.respuesta ?? (typeof parsed.output === "string" ? parsed.output : null) ?? content;
+    } catch {}
+  }
+  return { id: row.id, session_id: row.session_id, role, content };
 }
 
 function ConvThread({ messages }) {
@@ -39,9 +47,7 @@ function ConvThread({ messages }) {
             }}
           >
             <p className="whitespace-pre-wrap">{m.content}</p>
-            <p className="text-[10px] mt-1" style={{ color: "#484F58" }}>
-              {format(new Date(m.created_at), "HH:mm:ss", { locale: es })}
-            </p>
+            <p className="text-[10px] mt-1" style={{ color: "#484F58" }}>#{m.id}</p>
           </div>
         </div>
       ))}
@@ -60,9 +66,9 @@ export default function Mensajes() {
     setLoading(true);
     const { data } = await supabase
       .from("n8n_chat_histories")
-      .select("id, session_id, message, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200);
+      .select("id, session_id, message")
+      .order("id", { ascending: false })
+      .limit(500);
     setRows(data ?? []);
     setLoading(false);
   }
@@ -81,9 +87,10 @@ export default function Mensajes() {
     .map(([key, msgs]) => ({
       key,
       mensajes: msgs.length,
-      ultimo: msgs[0]?.created_at,
+      ultimoId: msgs[0]?.id,
       msgs: [...msgs].reverse(), // cronológico para mostrar
     }))
+    .sort((a, b) => (b.ultimoId ?? 0) - (a.ultimoId ?? 0))
     .filter((s) => !search || s.key.includes(search));
 
   return (
@@ -161,7 +168,7 @@ export default function Mensajes() {
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="text-xs" style={{ color: "#8B949E" }}>{s.mensajes} msgs</span>
                   <span className="text-[10px]" style={{ color: "#484F58" }}>
-                    {s.ultimo ? format(new Date(s.ultimo), "dd/MM HH:mm", { locale: es }) : ""}
+                    #{s.ultimoId}
                   </span>
                   <ChevronDown
                     size={14}
