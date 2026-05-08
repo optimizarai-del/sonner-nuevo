@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { LayoutDashboard, MessageSquare, FileText, Brain, Send, Settings, LogOut, Users, Shield, Phone } from "lucide-react";
+import SonnerLogo from "../SonnerLogo";
 
 const WaIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -31,17 +32,8 @@ export default function Sidebar() {
     <aside className="w-56 flex flex-col shrink-0" style={{ background: "#161B22", borderRight: "1px solid #21262D" }}>
 
       {/* Logo */}
-      <div className="p-5 flex items-center gap-3" style={{ borderBottom: "1px solid #21262D" }}>
-        <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-sm"
-          style={{ background: "linear-gradient(135deg, #2B6BF3, #1742ab)" }}
-        >
-          SNR
-        </div>
-        <div>
-          <p className="text-white font-bold text-sm leading-none">Sonner</p>
-          <p className="text-[10px] leading-none mt-0.5" style={{ color: "#484F58" }}>Sonido e Iluminación</p>
-        </div>
+      <div className="px-5 py-6 flex items-center justify-center" style={{ borderBottom: "1px solid #21262D" }}>
+        <SonnerLogo variant="full" color="#fff" size={26} />
       </div>
 
       {/* Nav */}

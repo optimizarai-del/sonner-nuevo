@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import SonnerLogo from "../components/SonnerLogo";
 
 const ADMIN_USER = import.meta.env.VITE_ADMIN_USERNAME || "admin";
 const ADMIN_PASS = import.meta.env.VITE_ADMIN_PASSWORD || "sonner2026";
@@ -26,17 +27,7 @@ export default function Login() {
 
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 text-white font-black text-xl tracking-wider"
-            style={{
-              background: "linear-gradient(135deg, #2B6BF3 0%, #1742ab 100%)",
-              boxShadow: "0 0 40px #2B6BF344",
-            }}
-          >
-            SNR
-          </div>
-          <h1 className="text-xl font-bold text-white">Sonner</h1>
-          <p className="text-xs mt-1" style={{ color: "#484F58" }}>SONIDO E ILUMINACIÓN</p>
+          <SonnerLogo variant="full" color="#fff" size={48} />
         </div>
 
         {/* Card */}

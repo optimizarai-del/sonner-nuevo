@@ -1,8 +1,7 @@
+/* Inter (cuerpo) y Audiowide (logo + headings) — cargadas en index.html para evitar warning de PostCSS */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   body {
@@ -10,6 +9,12 @@
     color: #E6EDF3;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
+  }
+
+  /* Tipografía del logo en clase utilitaria reusable */
+  .font-brand {
+    font-family: 'Audiowide', 'Impact', sans-serif;
+    letter-spacing: 0.02em;
   }
 
   ::-webkit-scrollbar { width: 5px; height: 5px; }
