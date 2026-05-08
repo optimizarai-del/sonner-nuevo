@@ -7,18 +7,32 @@ from datetime import datetime
 import anthropic
 
 from ..config import settings
+from . import credentials
 from .analytics import TOOLS, TOOL_FNS
 
 logger = logging.getLogger(__name__)
 
 _client: anthropic.Anthropic | None = None
+_client_key: str | None = None  # tracking de qué key se usó al crear el cliente
 
 
 def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        _client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
+    """
+    Obtiene cliente Anthropic. Si la API key cambió en la base de datos,
+    recrea el cliente. Esto permite editar la credencial desde la UI sin reiniciar.
+    """
+    global _client, _client_key
+    api_key = credentials.get("ANTHROPIC_API_KEY", settings.ANTHROPIC_API_KEY)
+    if not api_key:
+        raise RuntimeError("ANTHROPIC_API_KEY no configurada — agregala en Configuración → Credenciales")
+    if _client is None or _client_key != api_key:
+        _client = anthropic.Anthropic(api_key=api_key)
+        _client_key = api_key
     return _client
+
+
+def _get_model() -> str:
+    return credentials.get("ANTHROPIC_MODEL", settings.ANTHROPIC_MODEL) or "claude-haiku-4-5-20251001"
 
 
 SYSTEM_PROMPT = """Sos el ANALISTA DE DATOS de SONNER Sonido e Iluminación.
@@ -61,7 +75,7 @@ def consultar(question: str) -> str:
 
     for i in range(max_iters):
         resp = client.messages.create(
-            model=settings.ANTHROPIC_MODEL,
+            model=_get_model(),
             max_tokens=2048,
             system=system,
             tools=TOOLS,

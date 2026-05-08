@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import {
   Settings, Building2, Plug, Activity, Save, Check, AlertCircle,
   Database, Globe, FileText, Loader2, RefreshCw,
+  Key, Eye, EyeOff, Edit3, X,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
 
@@ -38,6 +39,117 @@ function Field({ label, children }) {
   );
 }
 
+// ── Tarjeta de credencial editable ────────────────────────────────────────────
+function CredentialRow({ item, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [show, setShow] = useState(false);
+  const [val, setVal] = useState(item.value ?? "");
+  const [saving, setSaving] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  useEffect(() => { setVal(item.value ?? ""); }, [item.value, item.is_set]);
+
+  async function save() {
+    setSaving(true);
+    try {
+      await onSave(item.key, val);
+      setSavedFlash(true);
+      setEditing(false);
+      setTimeout(() => setSavedFlash(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg px-4 py-3"
+      style={{ background: "#0D1117", border: "1px solid #21262D" }}>
+      <div className="flex items-center gap-3 mb-2">
+        <div className="w-2 h-2 rounded-full shrink-0"
+          style={{ background: item.is_set ? "#3FB950" : "#F85149" }} />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-mono text-white">{item.key}</p>
+          {item.description && (
+            <p className="text-xs mt-0.5" style={{ color: "#8B949E" }}>{item.description}</p>
+          )}
+        </div>
+        <span className="text-[10px] font-bold px-2 py-0.5 rounded shrink-0" style={{
+          background: item.is_set ? "#3FB95022" : "#F8514922",
+          color:      item.is_set ? "#3FB950"   : "#F85149",
+        }}>
+          {item.is_set ? "CONFIGURADO" : "FALTA"}
+        </span>
+        {savedFlash && <Check size={14} style={{ color: "#3FB950" }} />}
+      </div>
+
+      {editing ? (
+        <div className="flex items-center gap-2">
+          <div className="flex-1 relative">
+            <input
+              type={item.is_secret && !show ? "password" : "text"}
+              value={val}
+              onChange={(e) => setVal(e.target.value)}
+              placeholder={item.is_secret ? "•••••••••" : "Valor..."}
+              className="input w-full text-sm pr-9"
+            />
+            {item.is_secret && (
+              <button
+                type="button"
+                onClick={() => setShow((s) => !s)}
+                className="absolute right-2 top-1/2 -translate-y-1/2"
+                style={{ color: "#8B949E" }}
+              >
+                {show ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
+            )}
+          </div>
+          <button
+            onClick={save}
+            disabled={saving || !val.trim()}
+            className="text-white text-xs font-medium px-3 py-2 rounded-lg disabled:opacity-50"
+            style={{ background: "#2B6BF3" }}
+          >
+            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+          </button>
+          <button
+            onClick={() => { setEditing(false); setVal(item.value ?? ""); }}
+            className="text-xs font-medium px-3 py-2 rounded-lg"
+            style={{ background: "#21262D", color: "#8B949E" }}
+          >
+            <X size={12} />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <div className="flex-1 px-3 py-2 rounded-lg text-xs font-mono truncate"
+            style={{ background: "#161B22", border: "1px solid #21262D", color: "#8B949E" }}>
+            {item.is_secret
+              ? (item.is_set ? "•••••••••••••••••" : <span style={{ color: "#484F58" }}>(sin valor)</span>)
+              : (item.value || <span style={{ color: "#484F58" }}>(sin valor)</span>)}
+          </div>
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-lg transition-colors"
+            style={{ background: "#21262D", color: "#8B949E", border: "1px solid #30363D" }}
+          >
+            <Edit3 size={12} />
+            Editar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const CATEGORY_LABELS = {
+  anthropic: { label: "Anthropic (Claude)", color: "#D29922", icon: "🧠" },
+  google:    { label: "Google (Drive + Docs)", color: "#3FB950", icon: "📄" },
+  whatsapp:  { label: "WhatsApp Cloud API", color: "#25D366", icon: "💬" },
+  telegram:  { label: "Telegram", color: "#0088cc", icon: "✈️" },
+  n8n:       { label: "n8n", color: "#A371F7", icon: "🔗" },
+  general:   { label: "General", color: "#2B6BF3", icon: "⚙️" },
+};
+
 function ServiceRow({ label, url, status }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 rounded-lg"
@@ -72,6 +184,39 @@ export default function Configuracion() {
   const [health, setHealth] = useState({
     backend: "loading", supabase: "loading", n8n_chat: "loading",
   });
+
+  // Credenciales
+  const [credentials, setCredentials] = useState([]);
+  const [loadingCreds, setLoadingCreds] = useState(false);
+  const [credsError, setCredsError]     = useState("");
+
+  async function loadCredentials() {
+    setLoadingCreds(true);
+    setCredsError("");
+    try {
+      const res = await fetch(`${CONTRATOS_API}/api/settings`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setCredentials(data.items ?? []);
+    } catch (e) {
+      setCredsError("No se pudieron cargar las credenciales: " + e.message);
+    } finally {
+      setLoadingCreds(false);
+    }
+  }
+
+  async function saveCredential(key, value) {
+    const res = await fetch(`${CONTRATOS_API}/api/settings/${encodeURIComponent(key)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ value }),
+    });
+    if (!res.ok) {
+      const t = await res.text();
+      throw new Error(`HTTP ${res.status}: ${t.slice(0, 200)}`);
+    }
+    await loadCredentials();
+  }
 
   async function loadEmpresa() {
     const { data } = await supabase
@@ -121,7 +266,7 @@ export default function Configuracion() {
       .catch(() => setHealth((h) => ({ ...h, n8n_chat: "error" })));
   }
 
-  useEffect(() => { loadEmpresa(); checkHealth(); }, []);
+  useEffect(() => { loadEmpresa(); checkHealth(); loadCredentials(); }, []);
 
   function setField(field) {
     return (e) => setEmpresa((s) => ({ ...s, [field]: e.target.value }));
@@ -187,6 +332,72 @@ export default function Configuracion() {
             {savingEmpresa
               ? <><Loader2 size={14} className="animate-spin" /> Guardando...</>
               : <><Save size={14} /> Guardar</>}
+          </button>
+        </div>
+      </Section>
+
+      {/* ── Credenciales ───────────────────────────────────────────────────── */}
+      <Section
+        icon={Key}
+        title="Credenciales y API keys"
+        subtitle="Configurá las claves de Google, Anthropic, WhatsApp, etc. Se guardan encriptadas en Supabase."
+        color="#D29922"
+      >
+        {credsError && (
+          <div className="text-xs px-3 py-2 rounded-lg mb-3 flex items-center gap-2"
+            style={{ background: "#2c0e0e", color: "#f85149", border: "1px solid #f8514944" }}>
+            <AlertCircle size={13} /> {credsError}
+          </div>
+        )}
+        {loadingCreds && credentials.length === 0 ? (
+          <div className="text-center py-6">
+            <Loader2 size={18} className="animate-spin mx-auto" style={{ color: "#8B949E" }} />
+          </div>
+        ) : credentials.length === 0 ? (
+          <p className="text-xs text-center py-4" style={{ color: "#484F58" }}>
+            Sin credenciales configuradas. Verificá que el backend tenga la SUPABASE_SERVICE_ROLE_KEY.
+          </p>
+        ) : (
+          (() => {
+            // Agrupar por categoría
+            const byCat = {};
+            for (const c of credentials) {
+              const cat = c.category || "general";
+              if (!byCat[cat]) byCat[cat] = [];
+              byCat[cat].push(c);
+            }
+            const order = ["anthropic", "google", "whatsapp", "telegram", "n8n", "general"];
+            return (
+              <div className="space-y-5">
+                {order.filter((k) => byCat[k]).map((cat) => {
+                  const meta = CATEGORY_LABELS[cat] || CATEGORY_LABELS.general;
+                  return (
+                    <div key={cat}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span style={{ color: meta.color }}>{meta.icon}</span>
+                        <p className="text-xs font-semibold uppercase tracking-wide"
+                          style={{ color: meta.color }}>{meta.label}</p>
+                      </div>
+                      <div className="space-y-2">
+                        {byCat[cat].map((item) => (
+                          <CredentialRow key={item.key} item={item} onSave={saveCredential} />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()
+        )}
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={loadCredentials}
+            className="flex items-center gap-2 text-xs font-medium px-4 py-2 rounded-lg transition-colors"
+            style={{ background: "#21262D", color: "#8B949E", border: "1px solid #30363D" }}
+          >
+            <RefreshCw size={12} className={loadingCreds ? "animate-spin" : ""} />
+            Recargar
           </button>
         </div>
       </Section>

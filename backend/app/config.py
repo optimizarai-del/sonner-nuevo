@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     # ── Supabase ──────────────────────────────────────────────────────────────
     SUPABASE_URL: str = "https://wndfjicwzmsuxxcsnccl.supabase.co"
     SUPABASE_ANON_KEY: str
+    # service_role key — saltea RLS, solo el backend la conoce
+    SUPABASE_SERVICE_ROLE_KEY: str = ""
 
     # ── Anthropic (Analista IA) ───────────────────────────────────────────────
     ANTHROPIC_API_KEY: str = ""

@@ -13,6 +13,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 
 from ..config import settings
+from . import credentials as creds
 
 
 SCOPES = [
@@ -22,15 +23,28 @@ SCOPES = [
 
 
 def _credentials() -> Credentials:
-    """Construye credenciales OAuth2 desde el refresh token."""
+    """Construye credenciales OAuth2 desde el refresh token (DB con fallback a env)."""
+    refresh_token = creds.get("GOOGLE_REFRESH_TOKEN", settings.GOOGLE_REFRESH_TOKEN)
+    client_id     = creds.get("GOOGLE_CLIENT_ID",     settings.GOOGLE_CLIENT_ID)
+    client_secret = creds.get("GOOGLE_CLIENT_SECRET", settings.GOOGLE_CLIENT_SECRET)
+    if not (refresh_token and client_id and client_secret):
+        raise RuntimeError("Credenciales de Google incompletas — completalas en Configuración → Credenciales")
     return Credentials(
         token=None,
-        refresh_token=settings.GOOGLE_REFRESH_TOKEN,
+        refresh_token=refresh_token,
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=settings.GOOGLE_CLIENT_ID,
-        client_secret=settings.GOOGLE_CLIENT_SECRET,
+        client_id=client_id,
+        client_secret=client_secret,
         scopes=SCOPES,
     )
+
+
+def _template_id() -> str:
+    return creds.get("GOOGLE_DRIVE_TEMPLATE_DOC_ID", settings.GOOGLE_DRIVE_TEMPLATE_DOC_ID) or ""
+
+
+def _folder_id() -> str:
+    return creds.get("GOOGLE_DRIVE_CONTRATOS_FOLDER_ID", settings.GOOGLE_DRIVE_CONTRATOS_FOLDER_ID) or ""
 
 
 def _drive():
@@ -55,10 +69,10 @@ def generar_contrato(form: dict[str, Any]) -> dict[str, str]:
 
     # 1. Copiar template a la carpeta de contratos
     copia = drive.files().copy(
-        fileId=settings.GOOGLE_DRIVE_TEMPLATE_DOC_ID,
+        fileId=_template_id(),
         body={
             "name": base_name,
-            "parents": [settings.GOOGLE_DRIVE_CONTRATOS_FOLDER_ID],
+            "parents": [_folder_id()],
         },
         supportsAllDrives=True,
     ).execute()
@@ -116,7 +130,7 @@ def generar_contrato(form: dict[str, Any]) -> dict[str, str]:
     # 4. Subir el PDF a la misma carpeta
     pdf_metadata = {
         "name": f"{base_name}.pdf",
-        "parents": [settings.GOOGLE_DRIVE_CONTRATOS_FOLDER_ID],
+        "parents": [_folder_id()],
     }
     media = MediaIoBaseUpload(pdf_buffer, mimetype="application/pdf", resumable=False)
     pdf_file = drive.files().create(

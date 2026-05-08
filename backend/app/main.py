@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routers import contratos, analista
+from .routers import contratos, analista, settings as settings_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -25,6 +25,7 @@ app.add_middleware(
 
 app.include_router(contratos.router)
 app.include_router(analista.router)
+app.include_router(settings_router.router)
 
 
 @app.get("/")
