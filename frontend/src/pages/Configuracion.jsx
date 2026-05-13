@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import {
   Settings, Building2, Plug, Activity, Save, Check, AlertCircle,
   Database, Globe, FileText, Loader2, RefreshCw,
-  Key, Eye, EyeOff, Edit3, X,
+  Key, Eye, EyeOff, Edit3, X, Users as UsersIcon, UserPlus, Trash2, Power,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
+import { listUsers, createUser, updateUser, deactivateUser } from "../utils/auth";
 
 const N8N_BASE       = import.meta.env.VITE_N8N_BASE       || "https://n8n.optimizar-ia.com";
 const CONTRATOS_API  = import.meta.env.VITE_CONTRATOS_API  || "https://backend-sonner.optimizar-ia.com";
@@ -141,6 +142,142 @@ function CredentialRow({ item, onSave }) {
   );
 }
 
+// ── Gestor de usuarios ────────────────────────────────────────────────────────
+const ROLE_META = {
+  admin:     { label: "Admin",     color: "#2B6BF3" },
+  armador:   { label: "Armador",   color: "#3FB950" },
+  mayorista: { label: "Mayorista", color: "#D29922" },
+};
+
+function UserRow({ user, onEdit, onDeactivate }) {
+  const meta = ROLE_META[user.role] || { label: user.role, color: "#8B949E" };
+  return (
+    <div className="rounded-lg px-4 py-3 flex items-center gap-3"
+      style={{ background: "#0D1117", border: "1px solid #21262D" }}>
+      <div className="w-2 h-2 rounded-full shrink-0"
+        style={{ background: user.active ? "#3FB950" : "#484F58" }} />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-white">{user.name}</p>
+        <p className="text-xs font-mono mt-0.5" style={{ color: "#8B949E" }}>@{user.username}</p>
+      </div>
+      <span className="text-[10px] font-semibold px-2 py-1 rounded shrink-0"
+        style={{ background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}44` }}>
+        {meta.label}
+      </span>
+      <button
+        onClick={() => onEdit(user)}
+        className="p-2 rounded-lg transition-colors hover:bg-[#1C2230]"
+        style={{ color: "#8B949E" }}
+        title="Editar"
+      >
+        <Edit3 size={13} />
+      </button>
+      {user.active && (
+        <button
+          onClick={() => onDeactivate(user)}
+          className="p-2 rounded-lg transition-colors hover:bg-[#1C2230]"
+          style={{ color: "#F85149" }}
+          title="Desactivar"
+        >
+          <Power size={13} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function UserForm({ initial, onSubmit, onCancel }) {
+  const isNew = !initial?.id;
+  const [form, setForm] = useState({
+    username: initial?.username ?? "",
+    name:     initial?.name ?? "",
+    role:     initial?.role ?? "armador",
+    password: "",
+    active:   initial?.active ?? true,
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState("");
+
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const payload = { name: form.name, role: form.role, active: form.active };
+      if (isNew) {
+        payload.username = form.username.toLowerCase().trim();
+        payload.password = form.password;
+      } else if (form.password) {
+        payload.password = form.password;
+      }
+      await onSubmit(payload);
+    } catch (e) {
+      setError(e.message || "Error");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="rounded-lg p-4 space-y-3"
+      style={{ background: "#0D1117", border: "1px solid #2B6BF344" }}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: "#8B949E" }}>Usuario *</label>
+          <input className="input w-full text-sm" required disabled={!isNew}
+            value={form.username}
+            onChange={(e) => setForm({ ...form, username: e.target.value })}
+            placeholder="armador1" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: "#8B949E" }}>Nombre *</label>
+          <input className="input w-full text-sm" required
+            value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="Juan Pérez" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: "#8B949E" }}>Rol *</label>
+          <select className="input w-full text-sm" value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value })}>
+            <option value="admin">Admin</option>
+            <option value="armador">Armador</option>
+            <option value="mayorista">Mayorista</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium mb-1" style={{ color: "#8B949E" }}>
+            {isNew ? "Contraseña *" : "Nueva contraseña (opcional)"}
+          </label>
+          <input type="password" className="input w-full text-sm"
+            required={isNew} minLength={4}
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            placeholder="••••••••" />
+        </div>
+      </div>
+      {error && (
+        <div className="text-xs flex items-center gap-1.5" style={{ color: "#F85149" }}>
+          <AlertCircle size={12} /> {error}
+        </div>
+      )}
+      <div className="flex justify-end gap-2 pt-1">
+        <button type="button" onClick={onCancel}
+          className="text-xs px-3 py-1.5 rounded-lg"
+          style={{ background: "#21262D", color: "#8B949E", border: "1px solid #30363D" }}>
+          Cancelar
+        </button>
+        <button type="submit" disabled={saving}
+          className="text-xs text-white font-medium px-3 py-1.5 rounded-lg flex items-center gap-1.5 disabled:opacity-50"
+          style={{ background: "#2B6BF3" }}>
+          {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+          {isNew ? "Crear" : "Guardar"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 const CATEGORY_LABELS = {
   anthropic: { label: "Anthropic (Claude)", color: "#D29922", icon: "🧠" },
   google:    { label: "Google (Drive + Docs)", color: "#3FB950", icon: "📄" },
@@ -189,6 +326,41 @@ export default function Configuracion() {
   const [credentials, setCredentials] = useState([]);
   const [loadingCreds, setLoadingCreds] = useState(false);
   const [credsError, setCredsError]     = useState("");
+
+  // Usuarios
+  const [users, setUsers]           = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState("");
+  const [editingUser, setEditingUser] = useState(null);  // null | "new" | user obj
+
+  async function loadUsersList() {
+    setLoadingUsers(true);
+    setUsersError("");
+    try {
+      const data = await listUsers();
+      setUsers(data ?? []);
+    } catch (e) {
+      setUsersError(e.message || "Error cargando usuarios");
+    } finally {
+      setLoadingUsers(false);
+    }
+  }
+
+  async function handleSaveUser(payload) {
+    if (editingUser === "new") {
+      await createUser(payload);
+    } else if (editingUser?.id) {
+      await updateUser(editingUser.id, payload);
+    }
+    await loadUsersList();
+    setEditingUser(null);
+  }
+
+  async function handleDeactivate(user) {
+    if (!confirm(`¿Desactivar a ${user.name}? Después podés reactivarlo editándolo.`)) return;
+    await deactivateUser(user.id);
+    await loadUsersList();
+  }
 
   async function loadCredentials() {
     setLoadingCreds(true);
@@ -266,7 +438,7 @@ export default function Configuracion() {
       .catch(() => setHealth((h) => ({ ...h, n8n_chat: "error" })));
   }
 
-  useEffect(() => { loadEmpresa(); checkHealth(); loadCredentials(); }, []);
+  useEffect(() => { loadEmpresa(); checkHealth(); loadCredentials(); loadUsersList(); }, []);
 
   function setField(field) {
     return (e) => setEmpresa((s) => ({ ...s, [field]: e.target.value }));
@@ -334,6 +506,59 @@ export default function Configuracion() {
               : <><Save size={14} /> Guardar</>}
           </button>
         </div>
+      </Section>
+
+      {/* ── Usuarios ───────────────────────────────────────────────────────── */}
+      <Section
+        icon={UsersIcon}
+        title="Usuarios del panel"
+        subtitle="Gestión de cuentas. Roles: admin, armador, mayorista."
+        color="#3FB950"
+      >
+        {usersError && (
+          <div className="text-xs px-3 py-2 rounded-lg mb-3 flex items-center gap-2"
+            style={{ background: "#2c0e0e", color: "#f85149", border: "1px solid #f8514944" }}>
+            <AlertCircle size={13} /> {usersError}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {loadingUsers && users.length === 0 ? (
+            <div className="text-center py-4">
+              <Loader2 size={18} className="animate-spin mx-auto" style={{ color: "#8B949E" }} />
+            </div>
+          ) : (
+            users.map((u) => (
+              <UserRow key={u.id} user={u}
+                onEdit={(usr) => setEditingUser(usr)}
+                onDeactivate={handleDeactivate} />
+            ))
+          )}
+        </div>
+
+        {/* Edición / creación */}
+        {editingUser && (
+          <div className="mt-3">
+            <UserForm
+              initial={editingUser === "new" ? null : editingUser}
+              onSubmit={handleSaveUser}
+              onCancel={() => setEditingUser(null)}
+            />
+          </div>
+        )}
+
+        {!editingUser && (
+          <div className="flex justify-end mt-4">
+            <button
+              onClick={() => setEditingUser("new")}
+              className="flex items-center gap-2 text-white text-sm font-medium px-4 py-2 rounded-lg"
+              style={{ background: "#2B6BF3" }}
+            >
+              <UserPlus size={14} />
+              Nuevo usuario
+            </button>
+          </div>
+        )}
       </Section>
 
       {/* ── Credenciales ───────────────────────────────────────────────────── */}

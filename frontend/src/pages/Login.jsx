@@ -1,23 +1,27 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import SonnerLogo from "../components/SonnerLogo";
-
-const ADMIN_USER = import.meta.env.VITE_ADMIN_USERNAME || "admin";
-const ADMIN_PASS = import.meta.env.VITE_ADMIN_PASSWORD || "sonner2026";
+import { login } from "../utils/auth";
 
 export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError]       = useState("");
+  const [loading, setLoading]   = useState(false);
   const navigate = useNavigate();
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    if (username.trim() === ADMIN_USER && password === ADMIN_PASS) {
-      localStorage.setItem("sonner_token", "authenticated");
+    setError("");
+    setLoading(true);
+    try {
+      await login(username.trim(), password);
       navigate("/dashboard");
-    } else {
-      setError("Usuario o contraseña incorrectos");
+    } catch (err) {
+      setError(err.message || "Error de conexión");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -45,6 +49,7 @@ export default function Login() {
                 placeholder="admin"
                 required
                 autoComplete="username"
+                disabled={loading}
               />
             </div>
             <div>
@@ -57,6 +62,7 @@ export default function Login() {
                 placeholder="••••••••"
                 required
                 autoComplete="current-password"
+                disabled={loading}
               />
             </div>
             {error && (
@@ -64,10 +70,11 @@ export default function Login() {
             )}
             <button
               type="submit"
-              className="btn-primary w-full text-sm py-3 mt-2"
+              disabled={loading}
+              className="btn-primary w-full text-sm py-3 mt-2 flex items-center justify-center gap-2 disabled:opacity-60"
               style={{ boxShadow: "0 0 20px #2B6BF333" }}
             >
-              Entrar
+              {loading ? <><Loader2 size={14} className="animate-spin" /> Entrando...</> : "Entrar"}
             </button>
           </form>
         </div>

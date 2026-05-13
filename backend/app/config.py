@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     ANTHROPIC_MODEL: str = "claude-haiku-4-5-20251001"
 
+    # ── Auth (JWT) ────────────────────────────────────────────────────────────
+    JWT_SECRET: str = "sonner_jwt_secret_change_in_production_2026_xyz_abc_123"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRATION_HOURS: int = 8
+
     # ── CORS ──────────────────────────────────────────────────────────────────
     # Orígenes permitidos separados por coma
     CORS_ORIGINS: str = "https://sonner.optimizar-ia.com,http://localhost:5180,http://localhost:5173"

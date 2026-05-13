@@ -1,6 +1,10 @@
 import { NavLink, useNavigate } from "react-router-dom";
-import { LayoutDashboard, MessageSquare, FileText, Brain, Send, Settings, LogOut, Users, Shield, Phone } from "lucide-react";
+import {
+  LayoutDashboard, MessageSquare, FileText, Brain, Settings,
+  LogOut, Users, CalendarDays, Package,
+} from "lucide-react";
 import SonnerLogo from "../SonnerLogo";
+import { getUser, logout } from "../../utils/auth";
 
 const WaIcon = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -14,19 +18,38 @@ const TgIcon = () => (
   </svg>
 );
 
-const NAV = [
-  { to: "/dashboard",     icon: LayoutDashboard, label: "Dashboard" },
-  { to: "/crm",           icon: Users,           label: "CRM" },
-  { to: "/chat",          icon: MessageSquare,   label: "Chat interno" },
-  { to: "/whatsapp",      icon: WaIcon,          label: "WhatsApp" },
-  { to: "/contratos",     icon: FileText,        label: "Contratos" },
-  { to: "/analista",      icon: Brain,           label: "Analista IA" },
-  { to: "/telegram",      icon: TgIcon,          label: "Agente externo" },
-  { to: "/configuracion", icon: Settings,        label: "Configuración" },
+// ── Permisos por rol ─────────────────────────────────────────────────────────
+// Cada item tiene una lista de roles que pueden verlo
+const ALL_NAV = [
+  { to: "/dashboard",     icon: LayoutDashboard, label: "Dashboard",      roles: ["admin"] },
+  { to: "/crm",           icon: Users,           label: "CRM",            roles: ["admin"] },
+  { to: "/chat",          icon: MessageSquare,   label: "Chat interno",   roles: ["admin", "armador", "mayorista"] },
+  { to: "/eventos",       icon: CalendarDays,    label: "Eventos",        roles: ["admin", "armador", "mayorista"] },
+  { to: "/materiales",    icon: Package,         label: "Materiales",     roles: ["admin", "armador", "mayorista"] },
+  { to: "/whatsapp",      icon: WaIcon,          label: "WhatsApp",       roles: ["admin"] },
+  { to: "/contratos",     icon: FileText,        label: "Contratos",      roles: ["admin"] },
+  { to: "/analista",      icon: Brain,           label: "Analista IA",    roles: ["admin"] },
+  { to: "/telegram",      icon: TgIcon,          label: "Agente externo", roles: ["admin"] },
+  { to: "/configuracion", icon: Settings,        label: "Configuración",  roles: ["admin"] },
 ];
+
+const ROLE_LABELS = {
+  admin:     { label: "Administrador", color: "#2B6BF3" },
+  armador:   { label: "Armador",       color: "#3FB950" },
+  mayorista: { label: "Mayorista",     color: "#D29922" },
+};
 
 export default function Sidebar() {
   const navigate = useNavigate();
+  const user = getUser();
+  const role = user?.role || "armador";
+  const NAV = ALL_NAV.filter((item) => item.roles.includes(role));
+  const roleMeta = ROLE_LABELS[role] || { label: role, color: "#8B949E" };
+
+  function handleLogout() {
+    logout();
+    navigate("/login");
+  }
 
   return (
     <aside className="w-56 flex flex-col shrink-0" style={{ background: "#161B22", borderRight: "1px solid #21262D" }}>
@@ -61,10 +84,19 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="p-3" style={{ borderTop: "1px solid #21262D" }}>
+      {/* Footer: usuario + logout */}
+      <div className="p-3 space-y-2" style={{ borderTop: "1px solid #21262D" }}>
+        {user && (
+          <div className="px-3 py-2 rounded-lg" style={{ background: "#0D1117", border: "1px solid #21262D" }}>
+            <p className="text-xs font-semibold text-white truncate">{user.name}</p>
+            <p className="text-[10px] mt-0.5 inline-block px-1.5 py-0.5 rounded"
+              style={{ background: `${roleMeta.color}22`, color: roleMeta.color, border: `1px solid ${roleMeta.color}44` }}>
+              {roleMeta.label}
+            </p>
+          </div>
+        )}
         <button
-          onClick={() => { localStorage.removeItem("sonner_token"); navigate("/login"); }}
+          onClick={handleLogout}
           className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm font-medium text-[#8B949E] hover:text-white hover:bg-[#1C2230] transition-colors"
         >
           <LogOut size={15} />
