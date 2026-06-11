@@ -4,10 +4,10 @@ GET  /api/settings        → lista todas (sin valores secretos)
 PUT  /api/settings/{key}  → actualiza el valor
 """
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..services import credentials
+from ..services import auth, credentials
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -29,7 +29,11 @@ def listar() -> dict:
 
 
 @router.put("/{key}")
-def actualizar(key: str, payload: UpdateValue) -> dict:
+def actualizar(
+    key: str,
+    payload: UpdateValue,
+    _user: dict = Depends(auth.require_role("admin")),
+) -> dict:
     """Actualiza el valor de una credencial."""
     if not key or not key.replace("_", "").isalnum():
         raise HTTPException(status_code=400, detail="key inválida")
@@ -42,7 +46,7 @@ def actualizar(key: str, payload: UpdateValue) -> dict:
 
 
 @router.post("/invalidate")
-def invalidar() -> dict:
+def invalidar(_user: dict = Depends(auth.require_role("admin"))) -> dict:
     """Limpia el cache para forzar relectura de Supabase."""
     credentials.invalidate()
     return {"status": "cache cleared"}

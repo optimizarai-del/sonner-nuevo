@@ -5,7 +5,7 @@ import {
   Key, Eye, EyeOff, Edit3, X, Users as UsersIcon, UserPlus, Trash2, Power,
 } from "lucide-react";
 import { supabase } from "../utils/supabase";
-import { listUsers, createUser, updateUser, deactivateUser } from "../utils/auth";
+import { listUsers, createUser, updateUser, deactivateUser, getToken } from "../utils/auth";
 
 const N8N_BASE       = import.meta.env.VITE_N8N_BASE       || "https://n8n.optimizar-ia.com";
 const CONTRATOS_API  = import.meta.env.VITE_CONTRATOS_API  || "https://backend-sonner.optimizar-ia.com";
@@ -147,6 +147,7 @@ const ROLE_META = {
   admin:     { label: "Admin",     color: "#2B6BF3" },
   armador:   { label: "Armador",   color: "#3FB950" },
   mayorista: { label: "Mayorista", color: "#D29922" },
+  deposito:  { label: "Depósito",  color: "#A371F7" },
 };
 
 function UserRow({ user, onEdit, onDeactivate }) {
@@ -243,6 +244,7 @@ function UserForm({ initial, onSubmit, onCancel }) {
             <option value="admin">Admin</option>
             <option value="armador">Armador</option>
             <option value="mayorista">Mayorista</option>
+            <option value="deposito">Depósito</option>
           </select>
         </div>
         <div>
@@ -378,14 +380,19 @@ export default function Configuracion() {
   }
 
   async function saveCredential(key, value) {
+    const token = getToken();
     const res = await fetch(`${CONTRATOS_API}/api/settings/${encodeURIComponent(key)}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: JSON.stringify({ value }),
     });
     if (!res.ok) {
       const t = await res.text();
-      throw new Error(`HTTP ${res.status}: ${t.slice(0, 200)}`);
+      console.error(`Error guardando credencial — HTTP ${res.status}:`, t);
+      throw new Error("No se pudo guardar la credencial.");
     }
     await loadCredentials();
   }
@@ -512,7 +519,7 @@ export default function Configuracion() {
       <Section
         icon={UsersIcon}
         title="Usuarios del panel"
-        subtitle="Gestión de cuentas. Roles: admin, armador, mayorista."
+        subtitle="Gestión de cuentas. Roles: admin, armador, mayorista, deposito."
         color="#3FB950"
       >
         {usersError && (

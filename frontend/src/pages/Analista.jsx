@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Send, Brain, User, Sparkles } from "lucide-react";
+import { getToken } from "../utils/auth";
 
 const ANALISTA_API = import.meta.env.VITE_CONTRATOS_API
   || "https://backend-sonner.optimizar-ia.com";
@@ -89,9 +90,13 @@ export default function Analista() {
     try {
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), 90_000);
+      const token = getToken();
       const res = await fetch(`${ANALISTA_API}/api/analista`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ question: q }),
         signal: ctrl.signal,
       });

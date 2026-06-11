@@ -1,5 +1,12 @@
 """Configuración cargada desde variables de entorno."""
+import logging
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+logger = logging.getLogger(__name__)
+
+# Fallback solo para no romper despliegues existentes — definir JWT_SECRET en el entorno.
+_DEFAULT_JWT_SECRET = "sonner_jwt_secret_change_in_production_2026_xyz_abc_123"
 
 
 class Settings(BaseSettings):
@@ -21,7 +28,7 @@ class Settings(BaseSettings):
     ANTHROPIC_MODEL: str = "claude-haiku-4-5-20251001"
 
     # ── Auth (JWT) ────────────────────────────────────────────────────────────
-    JWT_SECRET: str = "sonner_jwt_secret_change_in_production_2026_xyz_abc_123"
+    JWT_SECRET: str = _DEFAULT_JWT_SECRET
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_HOURS: int = 8
 
@@ -37,3 +44,9 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+if settings.JWT_SECRET == _DEFAULT_JWT_SECRET:
+    logger.warning(
+        "SEGURIDAD: JWT_SECRET no está definido en el entorno — se está usando el "
+        "secret por defecto. Configurá la variable de entorno JWT_SECRET en producción."
+    )

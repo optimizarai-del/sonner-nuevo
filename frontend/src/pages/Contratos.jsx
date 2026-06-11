@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { FileText, Download, ExternalLink, Plus, X, Check, AlertCircle, Loader2, Trash2, Send, User, Calendar, DollarSign, Wrench, FileSignature } from "lucide-react";
 import { supabase } from "../utils/supabase";
+import { getToken } from "../utils/auth";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -102,23 +103,36 @@ export default function Contratos() {
     setError("");
     setResult(null);
 
-    const payload = {
-      ...form,
+    const montos = {
       valor_total_prestacion: parseInt(form.valor_total_prestacion) || 0,
       monto_total_pesos:      parseInt(form.monto_total_pesos)      || 0,
       monto_total_reserva:    parseInt(form.monto_total_reserva)    || 0,
       saldo_a_cancelar:       parseInt(form.saldo_a_cancelar)       || 0,
     };
 
+    // Validar que ningún monto sea negativo antes de enviar
+    if (Object.values(montos).some((m) => m < 0)) {
+      setError("Los montos no pueden ser negativos.");
+      setLoading(false);
+      return;
+    }
+
+    const payload = { ...form, ...montos };
+
     try {
+      const token = getToken();
       const res = await fetch(`${CONTRATOS_API}/api/contratos`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const errBody = await res.text();
-        throw new Error(`HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+        console.error(`Error generando contrato — HTTP ${res.status}:`, errBody);
+        throw new Error("No se pudo generar el contrato. Intentá de nuevo.");
       }
       const data = await res.json();
       setResult({ doc_url: data?.doc_url ?? null, pdf_url: data?.pdf_url ?? null });

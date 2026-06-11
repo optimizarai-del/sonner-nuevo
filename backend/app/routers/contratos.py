@@ -1,9 +1,10 @@
 """Router de contratos: genera Doc + PDF + guarda en Supabase."""
 import logging
 from typing import Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..services import auth
 from ..services.google_drive import generar_contrato
 from ..services.supabase_client import insertar_contrato
 
@@ -22,11 +23,11 @@ class ContratoIn(BaseModel):
     hora_inicio:            str
     hora_fin:               str
     dias_para_pagar:        str
-    valor_total_prestacion: int = 0
+    valor_total_prestacion: int = Field(default=0, ge=0)
     equipamientos:          str
-    monto_total_pesos:      int = 0
-    monto_total_reserva:    int = 0
-    saldo_a_cancelar:       int = 0
+    monto_total_pesos:      int = Field(default=0, ge=0)
+    monto_total_reserva:    int = Field(default=0, ge=0)
+    saldo_a_cancelar:       int = Field(default=0, ge=0)
     dia_firma:              str
     mes_firma:              str
     año_firma:              str
@@ -36,7 +37,10 @@ class ContratoIn(BaseModel):
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 @router.post("")
-def crear_contrato(payload: ContratoIn) -> dict[str, Any]:
+def crear_contrato(
+    payload: ContratoIn,
+    _user: dict = Depends(auth.require_role("admin")),
+) -> dict[str, Any]:
     """
     Genera un contrato completo:
     - Copia template de Google Docs

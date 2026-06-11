@@ -1,8 +1,9 @@
 """Router del Analista IA."""
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from ..services import auth
 from ..services.analista import consultar
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,10 @@ class AnalistaIn(BaseModel):
 
 
 @router.post("")
-def preguntar(payload: AnalistaIn) -> dict[str, str]:
+def preguntar(
+    payload: AnalistaIn,
+    _user: dict = Depends(auth.get_current_user),
+) -> dict[str, str]:
     """
     Recibe una pregunta y devuelve la respuesta del Analista IA en lenguaje natural.
     """
