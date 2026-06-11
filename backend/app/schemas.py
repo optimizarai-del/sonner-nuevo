@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
@@ -12,11 +12,11 @@ class ContratoRequest(BaseModel):
     hora_inicio: str
     hora_fin: str
     dias_para_pagar: str
-    valor_total_prestacion: int
+    valor_total_prestacion: int = Field(default=0, ge=0)
     equipamientos: str
-    monto_total_pesos: int
-    monto_total_reserva: int
-    saldo_a_cancelar: int
+    monto_total_pesos: int = Field(default=0, ge=0)
+    monto_total_reserva: int = Field(default=0, ge=0)
+    saldo_a_cancelar: int = Field(default=0, ge=0)
     dia_firma: str
     mes_firma: str
     año_firma: str

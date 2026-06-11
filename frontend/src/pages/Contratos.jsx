@@ -72,19 +72,33 @@ export default function Contratos() {
     setLoading(true);
     setError("");
     setResult(null);
+
+    const montos = {
+      valor_total_prestacion: parseInt(form.valor_total_prestacion) || 0,
+      monto_total_pesos:      parseInt(form.monto_total_pesos)      || 0,
+      monto_total_reserva:    parseInt(form.monto_total_reserva)    || 0,
+      saldo_a_cancelar:       parseInt(form.saldo_a_cancelar)       || 0,
+    };
+
+    // Validar que ningún monto sea negativo antes de enviar
+    if (Object.values(montos).some((m) => m < 0)) {
+      setError("Los montos no pueden ser negativos.");
+      setLoading(false);
+      return;
+    }
+
+    const payload = { ...form, ...montos };
+
     try {
-      const payload = {
-        ...form,
-        valor_total_prestacion: parseInt(form.valor_total_prestacion) || 0,
-        monto_total_pesos: parseInt(form.monto_total_pesos) || 0,
-        monto_total_reserva: parseInt(form.monto_total_reserva) || 0,
-        saldo_a_cancelar: parseInt(form.saldo_a_cancelar) || 0,
-      };
+      // api (axios) ya agrega el header Authorization: Bearer <token>
       const { data } = await api.post("/contratos", payload);
       setResult(data);
+      setForm(EMPTY);
       setShowForm(false);
     } catch (err) {
-      setError(err.response?.data?.detail || "Error generando contrato");
+      // Detalle solo en consola; mensaje genérico al usuario
+      console.error("Error generando contrato:", err.response?.data?.detail || err.message);
+      setError("No se pudo generar el contrato. Intentá de nuevo.");
     } finally {
       setLoading(false);
     }

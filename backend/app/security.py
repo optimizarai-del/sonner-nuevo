@@ -1,14 +1,24 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import logging
 import os
 import jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev_secret_change_me")
+logger = logging.getLogger(__name__)
+
+_DEFAULT_SECRET_KEY = "dev_secret_change_me"
+SECRET_KEY = os.getenv("SECRET_KEY", _DEFAULT_SECRET_KEY)
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
+
+if SECRET_KEY == _DEFAULT_SECRET_KEY:
+    logger.warning(
+        "SEGURIDAD: SECRET_KEY no esta definido en el entorno — se esta usando el "
+        "secret por defecto. Configura la variable de entorno SECRET_KEY en produccion."
+    )
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/admin/token")

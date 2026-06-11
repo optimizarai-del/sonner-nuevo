@@ -8,6 +8,7 @@ from ..models import Contrato
 from ..schemas import ContratoRequest, ContratoResponse, ContratoOut
 from ..core import google_drive as gd
 from ..core.google_gmail import notify_contrato
+from ..security import get_current_user
 import os
 
 router = APIRouter(prefix="/contratos", tags=["contratos"])
@@ -48,6 +49,7 @@ async def generar_contrato(
     req: ContratoRequest,
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    _user: dict = Depends(get_current_user),
 ):
     doc_name = f"contrato {req.nombre_prestatario} {req.dia_evento}"
 
