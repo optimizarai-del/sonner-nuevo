@@ -1,0 +1,33 @@
+name: Supabase keep-alive
+
+# Pega a Supabase una vez al día para que el proyecto (plan free) no se pause
+# por inactividad. Corre en la infra de GitHub: no depende de que el backend
+# esté prendido. Estable y sin mantenimiento.
+
+on:
+  schedule:
+    # 12:00 UTC = 09:00 Argentina, todos los días
+    - cron: "0 12 * * *"
+  workflow_dispatch: {}  # permite dispararlo a mano desde la pestaña Actions
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase REST (una lectura liviana)
+        run: |
+          set -euo pipefail
+          for intento in 1 2 3; do
+            code=$(curl -sS -o /dev/null -w "%{http_code}" \
+              "${{ secrets.SUPABASE_URL }}/rest/v1/contratos?select=id&limit=1" \
+              -H "apikey: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}") || code=000
+            echo "Intento $intento → HTTP $code"
+            if [ "$code" = "200" ]; then
+              echo "Supabase respondió OK. Keep-alive cumplido."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "No se pudo contactar a Supabase tras 3 intentos."
+          exit 1
