@@ -14,6 +14,7 @@ const WELCOME = {
   admin:     "Hola, soy el asistente interno de Sonner. Puedo consultar calendario, memoria, contratos, eventos y materiales. ¿En qué te ayudo?",
   armador:   "Hola. Como armador, te puedo decir qué eventos tenés próximos y qué materiales hay que cargar. ¿Qué consultás?",
   mayorista: "Hola. Te puedo informar disponibilidad de materiales y fechas. ¿En qué te ayudo?",
+  deposito:  "Hola. Te puedo decir qué eventos hay próximos y qué materiales necesitás llevar para cada uno. ¿Qué consultás?",
 };
 
 // ── Sub-componentes ────────────────────────────────────────────────────────────
@@ -223,6 +224,7 @@ export default function Chat() {
             {user.role === "admin"     && "Calendario · Memoria · Información interna"}
             {user.role === "armador"   && "Eventos próximos y materiales del armado"}
             {user.role === "mayorista" && "Disponibilidad de inventario y fechas"}
+            {user.role === "deposito"  && "Eventos y materiales — solo consulta"}
           </p>
         </div>
         <button

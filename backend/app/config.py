@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     ANTHROPIC_MODEL: str = "claude-haiku-4-5-20251001"
 
+    # ── Análisis de CSM ───────────────────────────────────────────────────────
+    # Key compartida para que n8n registre interacciones vía POST /api/csm/log
+    # (header X-CSM-Key). Si queda vacía, el endpoint no exige key.
+    CSM_INTERNAL_KEY: str = ""
+
     # ── Auth (JWT) ────────────────────────────────────────────────────────────
     JWT_SECRET: str = _DEFAULT_JWT_SECRET
     JWT_ALGORITHM: str = "HS256"

@@ -119,7 +119,7 @@ def list_users() -> list[dict]:
 
 
 def create_user(username: str, password: str, name: str, role: str) -> dict:
-    if role not in ("admin", "armador", "mayorista"):
+    if role not in ("admin", "armador", "mayorista", "deposito"):
         raise ValueError(f"Rol inválido: {role}")
     sb = _sb_admin()
     payload = {
@@ -139,7 +139,7 @@ def update_user(user_id: str, fields: dict[str, Any]) -> dict | None:
     safe = {}
     if "name" in fields:     safe["name"] = fields["name"].strip()
     if "role" in fields:
-        if fields["role"] not in ("admin", "armador", "mayorista"):
+        if fields["role"] not in ("admin", "armador", "mayorista", "deposito"):
             raise ValueError("Rol inválido")
         safe["role"] = fields["role"]
     if "active" in fields:   safe["active"] = bool(fields["active"])

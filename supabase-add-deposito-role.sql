@@ -1,0 +1,8 @@
+-- Agregar rol 'deposito' al CHECK constraint de la tabla users
+-- Ejecutar UNA VEZ en el SQL editor de Supabase
+
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+
+ALTER TABLE users
+  ADD CONSTRAINT users_role_check
+  CHECK (role IN ('admin', 'armador', 'mayorista', 'deposito'));

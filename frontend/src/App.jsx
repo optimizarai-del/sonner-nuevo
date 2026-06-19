@@ -10,6 +10,10 @@ import Telegram from "./pages/Telegram";
 import Configuracion from "./pages/Configuracion";
 import Eventos from "./pages/Eventos";
 import Materiales from "./pages/Materiales";
+import Equipo from "./pages/Equipo";
+import Gestiones from "./pages/Gestiones";
+import Mayoristas from "./pages/Mayoristas";
+import AnalisisCsm from "./pages/AnalisisCsm";
 import Login from "./pages/Login";
 import { isAuthenticated, hasRole } from "./utils/auth";
 
@@ -40,12 +44,18 @@ export default function App() {
           <Route path="contratos"     element={<RequireRole roles={["admin"]}><Contratos /></RequireRole>} />
           <Route path="analista"      element={<RequireRole roles={["admin"]}><Analista /></RequireRole>} />
           <Route path="telegram"      element={<RequireRole roles={["admin"]}><Telegram /></RequireRole>} />
+          <Route path="analisis-csm"  element={<RequireRole roles={["admin"]}><AnalisisCsm /></RequireRole>} />
           <Route path="configuracion" element={<RequireRole roles={["admin"]}><Configuracion /></RequireRole>} />
+          <Route path="equipo"        element={<RequireRole roles={["admin"]}><Equipo /></RequireRole>} />
+          <Route path="gestiones"     element={<RequireRole roles={["admin"]}><Gestiones /></RequireRole>} />
+          <Route path="mayoristas"    element={<RequireRole roles={["admin"]}><Mayoristas /></RequireRole>} />
 
-          {/* Todos los roles */}
+          {/* Chat: todos los roles (incluido deposito) */}
           <Route path="chat"          element={<Chat />} />
-          <Route path="eventos"       element={<Eventos />} />
-          <Route path="materiales"    element={<Materiales />} />
+
+          {/* Eventos y Materiales: deposito NO accede (solo via chat) */}
+          <Route path="eventos"       element={<RequireRole roles={["admin", "armador", "mayorista"]}><Eventos /></RequireRole>} />
+          <Route path="materiales"    element={<RequireRole roles={["admin", "armador", "mayorista"]}><Materiales /></RequireRole>} />
         </Route>
       </Routes>
     </BrowserRouter>
