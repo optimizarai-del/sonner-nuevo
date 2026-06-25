@@ -37,6 +37,8 @@ class Settings(BaseSettings):
     # vector store hay que embeber la query con el MISMO modelo.
     OPENAI_API_KEY: str = ""
     OPENAI_EMBED_MODEL: str = "text-embedding-3-small"
+    # Chat de OpenAI usado como LLM de RESERVA del sub-agente Memoria.
+    OPENAI_CHAT_MODEL: str = "gpt-4.1-mini"
 
     # ── Sub-agente Memoria (vector store) ─────────────────────────────────────
     # Key compartida para que n8n consulte vía POST /api/memoria (header X-Memoria-Key).

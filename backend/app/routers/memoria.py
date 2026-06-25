@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..services.memoria import memoria as mem
+from ..services.memoria import agente_memoria as ag
 from ..services.memoria import vectorstore as vs
 
 logger = logging.getLogger(__name__)
@@ -28,21 +29,35 @@ def _auth(x_memoria_key: Optional[str]) -> None:
         raise HTTPException(status_code=401, detail="key inválida")
 
 
+class HistMsg(BaseModel):
+    role: str
+    content: str
+
+
 class MemoriaIn(BaseModel):
     mensaje: str = Field(..., description="Comando del Agente Principal, ej: 'buscar en materiales: parlantes'")
     k: Optional[int] = Field(default=None, description="Top-K chunks por fuente")
+    historial: Optional[list[HistMsg]] = None
+    modo: str = Field(default="llm", description="'llm' (Claude→OpenAI→determinístico) | 'directo' (sin LLM)")
+    max_iter: int = 4
 
 
 @router.post("")
 def consultar(body: MemoriaIn, x_memoria_key: Optional[str] = Header(default=None)) -> dict:
-    """Devuelve {origen, encontrado, respuesta} verbatim desde el vector store.
+    """Devuelve {origen, encontrado, respuesta} desde el vector store.
+
+    modo='llm' (default): Claude redacta, OpenAI de reserva, y si ambos fallan
+    cae al parser determinístico. modo='directo': solo el parser determinístico.
 
     Nunca tira 500 hacia n8n: ante error inesperado responde un contrato válido
     con encontrado:'no' para que el Agente Principal pueda seguir.
     """
     _auth(x_memoria_key)
     try:
-        return mem.consultar(body.mensaje, k=body.k)
+        if body.modo == "directo":
+            return mem.consultar(body.mensaje, k=body.k)
+        hist = [{"role": h.role, "content": h.content} for h in (body.historial or [])]
+        return ag.responder(body.mensaje, historial=hist, max_iter=body.max_iter)
     except Exception as e:  # noqa: BLE001
         logger.exception("Memoria falló")
         return JSONResponse(status_code=200, content={
