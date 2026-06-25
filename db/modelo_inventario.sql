@@ -98,3 +98,9 @@ select
 from materiales m
 where m.activo
 order by m.categoria, m.producto;
+
+-- ── Acceso del frontend (anon key, sin Supabase Auth) ───────────────────────
+-- La plataforma opera estas tablas con el anon key, igual que blocklist.
+alter table public.materiales        disable row level security;
+alter table public.eventos           disable row level security;
+alter table public.evento_materiales disable row level security;
