@@ -3,6 +3,7 @@ from supabase import create_client, Client
 from ..config import settings
 
 _client: Client | None = None
+_admin_client: Client | None = None
 
 
 def get_supabase() -> Client:
@@ -10,6 +11,15 @@ def get_supabase() -> Client:
     if _client is None:
         _client = create_client(settings.SUPABASE_URL, settings.SUPABASE_ANON_KEY)
     return _client
+
+
+def get_supabase_admin() -> Client:
+    """Cliente con service_role (saltea RLS). Solo backend. Cae a anon si no hay key."""
+    global _admin_client
+    if _admin_client is None:
+        key = settings.SUPABASE_SERVICE_ROLE_KEY or settings.SUPABASE_ANON_KEY
+        _admin_client = create_client(settings.SUPABASE_URL, key)
+    return _admin_client
 
 
 def insertar_contrato(form: dict, urls: dict) -> dict | None:

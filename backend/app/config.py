@@ -32,6 +32,18 @@ class Settings(BaseSettings):
     # (header X-CSM-Key). Si queda vacía, el endpoint no exige key.
     CSM_INTERNAL_KEY: str = ""
 
+    # ── OpenAI (embeddings del sub-agente de Memoria) ─────────────────────────
+    # Los `documents` se embebieron con OpenAI (1536 dims). Para consultar el
+    # vector store hay que embeber la query con el MISMO modelo.
+    OPENAI_API_KEY: str = ""
+    OPENAI_EMBED_MODEL: str = "text-embedding-3-small"
+
+    # ── Sub-agente Memoria (vector store) ─────────────────────────────────────
+    # Key compartida para que n8n consulte vía POST /api/memoria (header X-Memoria-Key).
+    MEMORIA_INTERNAL_KEY: str = ""
+    MEMORIA_TOPK: int = 5
+    MEMORIA_MIN_SIMILARITY: float = 0.30
+
     # ── Auth (JWT) ────────────────────────────────────────────────────────────
     JWT_SECRET: str = _DEFAULT_JWT_SECRET
     JWT_ALGORITHM: str = "HS256"

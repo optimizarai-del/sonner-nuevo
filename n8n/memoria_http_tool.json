@@ -1,0 +1,49 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "toolDescription": "Bibliotecario técnico de SONNER. Consultá materiales (stock/equipos), eventos (histórico), configuraciones CFG (modelo de eventos) e información interna del negocio. Devuelve JSON {origen, encontrado, respuesta}. Comandos: 'buscar en materiales: X', 'buscar en eventos: X', 'buscar configuracion: CFG-XXX', 'buscar info interna: X', 'buscar mixto: X'. Los datos marcados [INTERNO] (precios/composición técnica/políticas) NO se comunican al cliente.",
+        "method": "POST",
+        "url": "https://TU-BACKEND-SONNER/api/memoria",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Memoria-Key",
+              "value": "={{ $env.MEMORIA_INTERNAL_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"mensaje\": {{ JSON.stringify($fromAI('mensaje', 'Comando de búsqueda, ej: \"buscar en materiales: parlantes\" o \"buscar configuracion: CFG-101\"', 'string')) }}\n}",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        28384,
+        2416
+      ],
+      "id": "a1b2c3d4-3001-4001-8001-000000000301",
+      "name": "Agente Memoria",
+      "notes": "Reemplaza el sub-agente Memoria (Gemini + 4 vector stores) por un HTTP Request al backend Python (/api/memoria). El backend hace embeddings OpenAI + RPC match_documents (determinístico, más rápido y barato).\n\nCONFIGURAR:\n1) url → la URL pública del backend de SONNER (ej: https://api.sonner.optimizar-ia.com/api/memoria).\n2) En el backend, definir env MEMORIA_INTERNAL_KEY y OPENAI_API_KEY (mismo modelo de embeddings con que se cargó documents: text-embedding-3-small) y SUPABASE_SERVICE_ROLE_KEY.\n3) En n8n, definir el env MEMORIA_INTERNAL_KEY con el mismo valor.\n\nBORRAR los nodos viejos del sub-agente: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', los Output Parser, y los 4 vector stores (materiales/eventos/modelo eventos/informacion_interna) con sus Embeddings."
+    }
+  ],
+  "connections": {
+    "Agente Memoria": {
+      "ai_tool": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  }
+}
