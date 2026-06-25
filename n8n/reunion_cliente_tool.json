@@ -1,0 +1,57 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "returnAll": false,
+        "limit": 10,
+        "options": {
+          "query": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('telefono_cliente', 'Telefono del cliente (solo digitos) para buscar su reunion agendada', 'string') }}",
+          "timeMin": "={{ $now.toISO() }}",
+          "timeMax": "={{ $now.plus({ days: 90 }).toISO() }}",
+          "singleEvents": true,
+          "orderBy": "startTime",
+          "timeZone": {
+            "__rl": true,
+            "value": "America/Argentina/Buenos_Aires",
+            "mode": "list",
+            "cachedResultName": "America/Argentina/Buenos_Aires"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        30080,
+        1900
+      ],
+      "id": "c3d4e5f6-2001-4001-8001-000000000201",
+      "name": "Consultar_Reunion",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      },
+      "notes": "TOOL del agente: busca la reunión agendada del cliente en el calendario de REUNIONES.\n1) En 'Calendar' elegí el calendario de reuniones (Calendly/Gabriel).\n2) El agente le pasa el teléfono del cliente como 'query'; devuelve las reuniones futuras que lo contengan.\nIMPORTANTE: el teléfono debe figurar en el título/descripción del evento para que la búsqueda lo encuentre."
+    }
+  ],
+  "connections": {
+    "Consultar_Reunion": {
+      "ai_tool": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  }
+}

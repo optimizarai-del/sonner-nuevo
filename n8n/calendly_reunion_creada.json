@@ -1,0 +1,157 @@
+{
+  "name": "SONNER · Calendly → Supabase + confirmación WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calendly-sonner",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        24400,
+        1700
+      ],
+      "id": "d4e5f6a7-3001-4001-8001-000000000301",
+      "name": "Calendly - Reunión creada",
+      "webhookId": "calendly-sonner-reunion",
+      "notes": "Pegá esta URL de producción en la suscripción de webhook de Calendly (evento invitee.created)."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extrae los datos de la reunión desde el payload de Calendly (invitee.created).\nconst p = ($json.body && $json.body.payload) ? $json.body.payload : ($json.payload || $json);\n\n// Teléfono: primero text_reminder_number, si no, lo busca en las preguntas del formulario.\nlet telRaw = p.text_reminder_number || '';\nif (!telRaw && Array.isArray(p.questions_and_answers)) {\n  for (const qa of p.questions_and_answers) {\n    const d = String(qa.answer || '').replace(/\\D/g, '');\n    if (d.length >= 8) { telRaw = qa.answer; break; }\n  }\n}\nconst telefono = String(telRaw).replace(/\\D/g, '');      // solo dígitos para guardar/cruzar\nconst to = telefono ? ('+' + telefono) : '';             // formato para enviar por WhatsApp\n\nconst ev = p.scheduled_event || {};\nconst fechaISO = ev.start_time || null;\n\nfunction fmt(iso) {\n  if (!iso) return '';\n  try {\n    return new Date(iso).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'full', timeStyle: 'short' });\n  } catch (e) { return iso; }\n}\nconst fecha_hora_texto = fmt(fechaISO);\n\nconst mensaje = `¡Hola${p.name ? ' ' + p.name : ''}! Ahí vi que agendaste 🙌 Te confirmo la reunión para el ${fecha_hora_texto}. Si necesitás cambiar algo, avisame. ¡Gracias!`;\n\nreturn [{ json: {\n  nombre: p.name || null,\n  telefono: telefono || null,\n  email: p.email || null,\n  fecha_hora: fechaISO,\n  evento: ev.name || null,\n  cancel_url: p.cancel_url || null,\n  reschedule_url: p.reschedule_url || null,\n  to,\n  fecha_hora_texto,\n  mensaje\n} }];"
+      },
+      "id": "d4e5f6a7-3002-4002-8002-000000000302",
+      "name": "Preparar datos reunión",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24624,
+        1700
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "reuniones",
+          "mode": "list",
+          "cachedResultName": "reuniones"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nombre": "={{ $json.nombre }}",
+            "telefono": "={{ $json.telefono }}",
+            "email": "={{ $json.email }}",
+            "fecha_hora": "={{ $json.fecha_hora }}",
+            "evento": "={{ $json.evento }}",
+            "estado": "agendada",
+            "cancel_url": "={{ $json.cancel_url }}",
+            "reschedule_url": "={{ $json.reschedule_url }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "d4e5f6a7-3003-4003-8003-000000000303",
+      "name": "Guardar reunión (Supabase)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        24848,
+        1700
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "zfE1AXrNqEsgGIB0",
+          "name": "memoria sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ycloud.com/v2/whatsapp/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.YCLOUD_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  from: 'REEMPLAZAR_NUMERO_WHATSAPP_SONNER',\n  to: $('Preparar datos reunión').item.json.to,\n  type: 'text',\n  text: { body: $('Preparar datos reunión').item.json.mensaje }\n}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "d4e5f6a7-3004-4004-8004-000000000304",
+      "name": "WhatsApp - Confirmar reunión",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        25072,
+        1700
+      ],
+      "notes": "Envía la confirmación por WhatsApp (YCloud).\n- X-API-Key: variable de entorno YCLOUD_API_KEY (o pegá la key literal).\n- 'from': reemplazá REEMPLAZAR_NUMERO_WHATSAPP_SONNER por el número de WhatsApp de SONNER en YCloud.\nSi ya tenés un nodo de envío de WhatsApp en tu flujo principal, podés usar ese en lugar de este HTTP."
+    }
+  ],
+  "connections": {
+    "Calendly - Reunión creada": {
+      "main": [
+        [
+          {
+            "node": "Preparar datos reunión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar datos reunión": {
+      "main": [
+        [
+          {
+            "node": "Guardar reunión (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar reunión (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp - Confirmar reunión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  }
+}

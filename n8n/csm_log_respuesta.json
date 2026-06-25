@@ -1,0 +1,179 @@
+{
+  "name": "SONNER · Registrar respuesta en Análisis de CSM",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a1b2c3d4-0001-4001-8001-000000000001",
+      "name": "Inicio (reemplazar por tu flujo)",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f0000000-0000-0000-0000-000000000001",
+              "name": "mensaje_cliente",
+              "value": "={{ $json.mensaje_cliente }}",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-0000-0000-000000000002",
+              "name": "respuesta_agente",
+              "value": "={{ $json.respuesta_agente }}",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-0000-0000-000000000003",
+              "name": "canal",
+              "value": "whatsapp",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-0000-0000-000000000004",
+              "name": "tipo_cliente",
+              "value": "={{ $json.tipo_cliente || 'minorista' }}",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-0000-0000-000000000005",
+              "name": "agente",
+              "value": "principal",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-0000-0000-000000000006",
+              "name": "wa_id",
+              "value": "={{ $json.wa_id }}",
+              "type": "string"
+            },
+            {
+              "id": "f0000000-0000-0000-0000-000000000007",
+              "name": "cliente_nombre",
+              "value": "={{ $json.cliente_nombre }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-0002-4002-8002-000000000002",
+      "name": "Mapear campos CSM",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -140,
+        300
+      ],
+      "notes": "Ajustá estas expresiones para que apunten a los datos reales de tu flujo:\n- mensaje_cliente: el texto que mandó el cliente\n- respuesta_agente: la respuesta del agente (campo 'respuesta' del JSON del agente principal)\n- canal: whatsapp | telegram | sandbox | mail\n- tipo_cliente: minorista | mayorista\n- agente: principal | calendario | salones\n- wa_id / cliente_nombre: opcionales"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://backend-sonner.optimizar-ia.com/api/csm/log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-CSM-Key",
+              "value": "={{ $env.CSM_INTERNAL_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "mensaje_cliente",
+              "value": "={{ $json.mensaje_cliente }}"
+            },
+            {
+              "name": "respuesta_agente",
+              "value": "={{ $json.respuesta_agente }}"
+            },
+            {
+              "name": "canal",
+              "value": "={{ $json.canal }}"
+            },
+            {
+              "name": "tipo_cliente",
+              "value": "={{ $json.tipo_cliente }}"
+            },
+            {
+              "name": "agente",
+              "value": "={{ $json.agente }}"
+            },
+            {
+              "name": "wa_id",
+              "value": "={{ $json.wa_id }}"
+            },
+            {
+              "name": "cliente_nombre",
+              "value": "={{ $json.cliente_nombre }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "a1b2c3d4-0003-4003-8003-000000000003",
+      "name": "POST /api/csm/log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        120,
+        300
+      ],
+      "notes": "Registra la interacción en el Análisis de CSM de SONNER.\nBody: cada campo por separado (JSON).\nX-CSM-Key se toma de la variable de entorno CSM_INTERNAL_KEY de n8n;\nsi preferís, reemplazá {{ $env.CSM_INTERNAL_KEY }} por el valor literal.\nneverError=true: si el log falla, no corta el flujo principal del agente."
+    }
+  ],
+  "connections": {
+    "Inicio (reemplazar por tu flujo)": {
+      "main": [
+        [
+          {
+            "node": "Mapear campos CSM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear campos CSM": {
+      "main": [
+        [
+          {
+            "node": "POST /api/csm/log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templatecredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "sonner"
+    },
+    {
+      "name": "csm"
+    }
+  ]
+}

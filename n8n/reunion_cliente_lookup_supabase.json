@@ -1,0 +1,63 @@
+{
+  "name": "SONNER · Contexto reunión del cliente (lee Supabase, cada ejecución)",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT nombre, telefono, fecha_hora, evento, estado\nFROM reuniones\nWHERE estado = 'agendada'\n  AND fecha_hora >= now()\n  AND RIGHT(regexp_replace(telefono, '[^0-9]', '', 'g'), 10)\n    = RIGHT(regexp_replace('{{ $('Edit Fields2').item.json.usuario }}', '[^0-9]', '', 'g'), 10)\nORDER BY fecha_hora ASC\nLIMIT 1;",
+        "options": {}
+      },
+      "id": "e5f6a7b8-4001-4001-8001-000000000401",
+      "name": "Reunión del cliente (Supabase)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        24544,
+        1424
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "zfE1AXrNqEsgGIB0",
+          "name": "memoria sonner"
+        }
+      },
+      "notes": "Lee la próxima reunión futura del cliente cruzando por los últimos 10 dígitos del teléfono.\nAjustá $('Edit Fields2').item.json.usuario si el nodo del teléfono se llama distinto.\nalwaysOutputData = true: si no tiene reunión, igual sigue el flujo."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Arma el contexto que lee el agente. Si no hay reunión, tiene:false.\nconst filas = $input.all();\nlet reunion = { tiene: false, fecha_hora_texto: null, titulo: null };\n\nconst r = filas[0] && filas[0].json ? filas[0].json : null;\nif (r && r.fecha_hora) {\n  let txt = r.fecha_hora;\n  try {\n    txt = new Date(r.fecha_hora).toLocaleString('es-AR', {\n      timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'full', timeStyle: 'short'\n    });\n  } catch (e) {}\n  reunion = { tiene: true, fecha_hora_texto: txt, titulo: r.evento || null };\n}\nreturn [{ json: { reunion_cliente: reunion } }];"
+      },
+      "id": "e5f6a7b8-4002-4002-8002-000000000402",
+      "name": "Armar contexto reunión",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24768,
+        1424
+      ],
+      "notes": "Salida: reunion_cliente = { tiene, fecha_hora_texto, titulo }.\nEn el prompt del agente referenciá: {{ $('Armar contexto reunión').item.json.reunion_cliente }}"
+    }
+  ],
+  "connections": {
+    "Reunión del cliente (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Armar contexto reunión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  }
+}

@@ -45,3 +45,4 @@ backend/google_client_secrets.json
 *.json
 !frontend/package.json
 !frontend/package-lock.json
+db/memoria_export/

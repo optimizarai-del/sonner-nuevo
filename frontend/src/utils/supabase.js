@@ -7,4 +7,10 @@ if (!SUPABASE_URL || !SUPABASE_ANON) {
   console.warn("[Supabase] Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY en .env");
 }
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON);
+// Defensivo: si faltan las env NO tiramos excepción a nivel de módulo (eso tumbaría
+// toda la app en pantalla blanca). Usamos un placeholder para que la app arranque; solo
+// fallarán en runtime las pantallas que realmente usen Supabase.
+export const supabase = createClient(
+  SUPABASE_URL || "https://placeholder.supabase.co",
+  SUPABASE_ANON || "placeholder-anon-key"
+);

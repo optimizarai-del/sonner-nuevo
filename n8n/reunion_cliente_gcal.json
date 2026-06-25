@@ -1,0 +1,80 @@
+{
+  "name": "SONNER · Contexto reunión del cliente (Google Calendar reuniones, cada ejecución)",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "returnAll": false,
+        "limit": 100,
+        "options": {
+          "timeMin": "={{ $now.toISO() }}",
+          "timeMax": "={{ $now.plus({ days: 90 }).toISO() }}",
+          "singleEvents": true,
+          "orderBy": "startTime",
+          "timeZone": {
+            "__rl": true,
+            "value": "America/Argentina/Buenos_Aires",
+            "mode": "list",
+            "cachedResultName": "America/Argentina/Buenos_Aires"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        24544,
+        1424
+      ],
+      "id": "a8b9c0d1-6001-4001-8001-000000000601",
+      "name": "Reuniones - Get Many",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      },
+      "notes": "Calendario de REUNIONES (donde Calendly agenda), NO el de eventos.\nEn 'Calendar' elegí ese calendario.\nTrae las reuniones futuras de los próximos 90 días.\nSi creaste una credencial nueva con el proyecto 'Sonner Calendarios', seleccionala acá."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Busca la reunión futura del cliente en el calendario de REUNIONES, cruzando por teléfono.\n// Entrada: eventos del nodo \"Reuniones - Get Many\".\n// IMPORTANTE: ajustá la ruta del teléfono si tu nodo no se llama 'Edit Fields2'.\nconst telefono = $('Edit Fields2').first().json.usuario;\nconst objetivo = String(telefono || '').replace(/\\D/g, '').slice(-10); // últimos 10 dígitos\n\nconst eventos = $input.all().map(i => i.json);\n\nfunction fmt(iso) {\n  if (!iso) return null;\n  try {\n    return new Date(iso).toLocaleString('es-AR', {\n      timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'full', timeStyle: 'short'\n    });\n  } catch (e) { return iso; }\n}\n\nlet reunion = { tiene: false, fecha_hora_texto: null, titulo: null };\nif (objetivo) {\n  for (const ev of eventos) {\n    const digitos = `${ev.summary || ''} ${ev.description || ''} ${ev.location || ''}`.replace(/\\D/g, '');\n    if (digitos.includes(objetivo)) {\n      const inicio = ev.start?.dateTime || ev.start?.date || null;\n      reunion = { tiene: true, fecha_hora_texto: fmt(inicio), titulo: ev.summary || null };\n      break;\n    }\n  }\n}\nreturn [{ json: { reunion_cliente: reunion } }];"
+      },
+      "id": "a8b9c0d1-6002-4002-8002-000000000602",
+      "name": "Armar contexto reunión",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24768,
+        1424
+      ],
+      "notes": "Salida: reunion_cliente = { tiene, fecha_hora_texto, titulo }.\nEn el prompt del agente referenciá: {{ $('Armar contexto reunión').item.json.reunion_cliente }}"
+    }
+  ],
+  "connections": {
+    "Reuniones - Get Many": {
+      "main": [
+        [
+          {
+            "node": "Armar contexto reunión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  }
+}

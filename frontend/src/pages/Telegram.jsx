@@ -85,14 +85,29 @@ export default function Telegram() {
     setAutoLoading(false);
   }
 
+  // ── Normalizar identificador ───────────────────────────────────────────────
+  // Quita caracteres invisibles (marcas de dirección Unicode \u202x/\u200x, NBSP,
+  // espacios) que llegan al pegar números desde WhatsApp, y deja solo dígitos con
+  // un único "+" inicial opcional. El match real en n8n se hace por los últimos
+  // 10 dígitos, pero guardamos limpio para que no haya basura en la tabla.
+  function normalizeIdentifier(raw) {
+    let v = (raw || "").replace(/[^\d+]/g, ""); // saca invisibles, espacios, todo menos dígitos y +
+    v = v.replace(/(?!^)\+/g, "");              // deja el + solo si está al inicio
+    return v;
+  }
+
   // ── Agregar a blocklist ────────────────────────────────────────────────────
   async function addBlocked() {
-    if (!newId.trim()) return;
+    const identifier = normalizeIdentifier(newId);
+    if (!identifier || identifier.replace(/\D/g, "").length < 8) {
+      setAddError("Número inválido. Ingresá al menos 8 dígitos.");
+      return;
+    }
     setAddLoading(true);
     setAddError("");
     const { error } = await supabase
       .from("blocklist")
-      .insert({ identifier: newId.trim(), label: newLabel.trim() });
+      .insert({ identifier, label: newLabel.trim() });
     if (error) {
       setAddError(error.code === "23505" ? "Este ID ya está bloqueado" : "Error al agregar");
     } else {

@@ -1,0 +1,175 @@
+{
+  "name": "SONNER · Reunión nueva (Google Calendar Trigger) → Supabase + WhatsApp",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "calendarId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list",
+          "cachedResultName": ""
+        },
+        "triggerOn": "eventCreated",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTrigger",
+      "typeVersion": 1,
+      "position": [
+        24400,
+        1900
+      ],
+      "id": "f6a7b8c9-5001-4001-8001-000000000501",
+      "name": "Reunión nueva (Google Calendar)",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      },
+      "notes": "Vigila el calendario donde Calendly agenda (funciona con Calendly GRATIS).\n1) En 'Calendar' elegí ese calendario de reuniones.\n2) Dispara cada minuto al detectar un evento nuevo.\nSi el calendario recibe eventos que NO son de Calendly, podés filtrar en Options → Match Term."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parsea el evento de Calendly creado en Google Calendar.\nconst ev = $json;\nconst desc = String(ev.description || '');\nconst summary = String(ev.summary || '');\n\n// Teléfono: primera secuencia de 8+ dígitos en la descripción.\nlet telefono = null;\nconst mTel = desc.replace(/\\s/g, ' ').match(/(\\+?\\d[\\d\\s().-]{7,}\\d)/);\nif (mTel) telefono = mTel[1].replace(/\\D/g, '');\nconst to = telefono ? ('+' + telefono) : '';\n\n// Email\nlet email = null;\nconst mMail = desc.match(/[\\w.+-]+@[\\w-]+\\.[\\w.-]+/);\nif (mMail) email = mMail[0];\n\n// Nombre: línea 'Name:' de Calendly o, si no, el título del evento.\nlet nombre = null;\nconst mName = desc.match(/Name:\\s*(.+)/i);\nif (mName) nombre = mName[1].trim();\nif (!nombre && summary) nombre = summary;\n\n// URLs de cancelar / reprogramar (Calendly las pone en la descripción)\nconst mCancel = desc.match(/Cancel:\\s*(\\S+)/i);\nconst mResch  = desc.match(/Reschedule:\\s*(\\S+)/i);\n\nconst fechaISO = ev.start?.dateTime || ev.start?.date || null;\n\nfunction fmt(iso) {\n  if (!iso) return '';\n  try {\n    return new Date(iso).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', dateStyle: 'full', timeStyle: 'short' });\n  } catch (e) { return iso; }\n}\nconst fecha_hora_texto = fmt(fechaISO);\n\nconst mensaje = `¡Hola${nombre ? ' ' + nombre : ''}! Ahí vi que agendaste 🙌 Te confirmo la reunión para el ${fecha_hora_texto}. Si necesitás cambiar algo, avisame. ¡Gracias!`;\n\nreturn [{ json: {\n  nombre: nombre || null,\n  telefono: telefono || null,\n  email: email || null,\n  fecha_hora: fechaISO,\n  evento: summary || null,\n  cancel_url: mCancel ? mCancel[1] : null,\n  reschedule_url: mResch ? mResch[1] : null,\n  to,\n  fecha_hora_texto,\n  mensaje\n} }];"
+      },
+      "id": "f6a7b8c9-5002-4002-8002-000000000502",
+      "name": "Parsear evento Calendly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        24624,
+        1900
+      ],
+      "notes": "Extrae teléfono/nombre/email/fecha de la descripción del evento. Es heurístico:\nverificá con un evento real cómo viene la descripción y ajustá los regex si hace falta."
+    },
+    {
+      "parameters": {
+        "operation": "insert",
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "reuniones",
+          "mode": "list",
+          "cachedResultName": "reuniones"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "nombre": "={{ $json.nombre }}",
+            "telefono": "={{ $json.telefono }}",
+            "email": "={{ $json.email }}",
+            "fecha_hora": "={{ $json.fecha_hora }}",
+            "evento": "={{ $json.evento }}",
+            "estado": "agendada",
+            "cancel_url": "={{ $json.cancel_url }}",
+            "reschedule_url": "={{ $json.reschedule_url }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "f6a7b8c9-5003-4003-8003-000000000503",
+      "name": "Guardar reunión (Supabase)",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        24848,
+        1900
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "zfE1AXrNqEsgGIB0",
+          "name": "memoria sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ycloud.com/v2/whatsapp/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.YCLOUD_API_KEY }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  from: 'REEMPLAZAR_NUMERO_WHATSAPP_SONNER',\n  to: $('Parsear evento Calendly').item.json.to,\n  type: 'text',\n  text: { body: $('Parsear evento Calendly').item.json.mensaje }\n}) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "f6a7b8c9-5004-4004-8004-000000000504",
+      "name": "WhatsApp - Confirmar reunión",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        25072,
+        1900
+      ],
+      "notes": "Confirmación por WhatsApp (YCloud). Poné YCLOUD_API_KEY y el número 'from' de SONNER.\nSi tenés un nodo de envío propio en el flujo principal, usá ese en su lugar.\nSolo envía si se pudo extraer el teléfono del evento."
+    }
+  ],
+  "connections": {
+    "Reunión nueva (Google Calendar)": {
+      "main": [
+        [
+          {
+            "node": "Parsear evento Calendly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear evento Calendly": {
+      "main": [
+        [
+          {
+            "node": "Guardar reunión (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar reunión (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "WhatsApp - Confirmar reunión",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  }
+}
