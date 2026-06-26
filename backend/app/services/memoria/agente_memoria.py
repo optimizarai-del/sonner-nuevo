@@ -44,7 +44,10 @@ REGLAS:
   Si no hay resultados: encontrado:"no" y respuesta "No se encontró información sobre [X]".
 - VERBATIM: la `respuesta` sale del contenido de los chunks; no reformules cifras, marcas ni equipos.
 - PRIVACIDAD: todo precio, monto o composición técnica (modelo_eventos) e info interna es INTERNO.
-  Prefijá esos datos con "[INTERNO — NO COMUNICAR AL CLIENTE] " y aclará que el precio depende de logística.
+  Prefijá esos datos con el texto EXACTO y LITERAL "[INTERNO — NO COMUNICAR AL CLIENTE] "
+  (copialo tal cual, NO lo reformules como "[MODELO TÉCNICO]", "[STOCK]", "[INFORMACIÓN]" ni nada parecido;
+  el Agente Principal busca ESE texto literal para saber qué ocultarle al cliente). Aclará que el precio
+  depende de logística. El stock de materiales NO es interno (podés mencionarlo sin prefijo).
 - Para códigos CFG usá EXCLUSIVAMENTE la fuente modelo_eventos.
 - `origen`: "materiales" | "eventos" | "modelo eventos" | "interna" | "mixto".
 - `encontrado`: "si" si existe el registro (stock 0 igual es "si").
