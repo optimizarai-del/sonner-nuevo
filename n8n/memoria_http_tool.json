@@ -4,27 +4,13 @@
       "parameters": {
         "toolDescription": "Bibliotecario tecnico de SONNER. Consulta materiales (stock/equipos), eventos (historico), configuraciones CFG (modelo de eventos) e informacion interna del negocio. Devuelve JSON {origen, encontrado, respuesta}. Comandos validos para el parametro mensaje: 'buscar en materiales: X', 'buscar en eventos: X', 'buscar configuracion: CFG-XXX', 'buscar info interna: X', 'buscar mixto: X'. Lo marcado [INTERNO] (precios/composicion tecnica/politicas) NO se comunica al cliente.",
         "method": "POST",
-        "url": "https://backend-sonner.optimizar-ia.com/api/memoria",
+        "url": "https://backend-sonner.optimizar-ia.com/api/memoria?mensaje={mensaje}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "X-Memoria-Key",
               "value": "={{ $env.MEMORIA_INTERNAL_KEY }}"
-            },
-            {
-              "name": "Content-Type",
-              "value": "application/json"
-            }
-          ]
-        },
-        "sendBody": true,
-        "specifyBody": "keypair",
-        "bodyParameters": {
-          "parameters": [
-            {
-              "name": "mensaje",
-              "value": "{mensaje}"
             }
           ]
         },
@@ -47,7 +33,7 @@
       ],
       "id": "a1b2c3d4-3001-4001-8001-000000000301",
       "name": "Memoria",
-      "notes": "Sub-agente Memoria via HTTP al backend Python (/api/memoria). Claude primario, OpenAI de reserva, parser determinista de respaldo.\n\nMECANISMO CORRECTO en n8n 2.26.8: body en modo keypair (NO json) + el valor del campo 'mensaje' es el placeholder {mensaje}, definido en 'Placeholder Definitions'. NO usar $fromAI dentro de este nodo ni body JSON: ambos hacen que n8n genere una clave de propiedad invalida y Claude rechaza el esquema.\n\nEl header Content-Type: application/json envia el body como JSON {\"mensaje\":\"...\"}.\n\nCONFIGURAR:\n1) url ya apunta a backend-sonner.optimizar-ia.com/api/memoria.\n2) Backend env: ANTHROPIC_API_KEY, OPENAI_API_KEY (embeddings text-embedding-3-small), SUPABASE_SERVICE_ROLE_KEY, MEMORIA_INTERNAL_KEY.\n3) n8n env: MEMORIA_INTERNAL_KEY con el mismo valor.\n\nNombre del nodo sin espacios ni acentos (por eso 'Memoria').\n\nBORRAR los nodos viejos: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', Output Parser, y los 4 vector stores con sus Embeddings."
+      "notes": "Sub-agente Memoria via HTTP al backend Python (/api/memoria). Claude primario, OpenAI de reserva, parser determinista de respaldo.\n\nMECANISMO en n8n 2.26.8: el comando va en la URL como query param ?mensaje={mensaje}. n8n solo reconoce los placeholders {..} dentro de la URL (no en el body keypair, y el body JSON colisiona con sus llaves). El backend acepta 'mensaje' tanto por query como por body.\n\nCONFIGURAR:\n1) url ya apunta a backend-sonner.optimizar-ia.com/api/memoria?mensaje={mensaje}.\n2) Backend env: ANTHROPIC_API_KEY, OPENAI_API_KEY (embeddings text-embedding-3-small), SUPABASE_SERVICE_ROLE_KEY, MEMORIA_INTERNAL_KEY.\n3) n8n env: MEMORIA_INTERNAL_KEY con el mismo valor.\n\nNombre del nodo sin espacios ni acentos (por eso 'Memoria').\n\nBORRAR los nodos viejos: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', Output Parser, y los 4 vector stores con sus Embeddings."
     }
   ],
   "connections": {
