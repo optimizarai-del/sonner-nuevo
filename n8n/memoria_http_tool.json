@@ -2,9 +2,9 @@
   "nodes": [
     {
       "parameters": {
-        "toolDescription": "Bibliotecario técnico de SONNER. Consultá materiales (stock/equipos), eventos (histórico), configuraciones CFG (modelo de eventos) e información interna del negocio. Devuelve JSON {origen, encontrado, respuesta}. Comandos: 'buscar en materiales: X', 'buscar en eventos: X', 'buscar configuracion: CFG-XXX', 'buscar info interna: X', 'buscar mixto: X'. Los datos marcados [INTERNO] (precios/composición técnica/políticas) NO se comunican al cliente.",
+        "toolDescription": "Bibliotecario tecnico de SONNER. Consulta materiales (stock/equipos), eventos (historico), configuraciones CFG (modelo de eventos) e informacion interna del negocio. Devuelve JSON {origen, encontrado, respuesta}. Comandos validos para el parametro mensaje: 'buscar en materiales: X', 'buscar en eventos: X', 'buscar configuracion: CFG-XXX', 'buscar info interna: X', 'buscar mixto: X'. Lo marcado [INTERNO] (precios/composicion tecnica/politicas) NO se comunica al cliente.",
         "method": "POST",
-        "url": "https://TU-BACKEND-SONNER/api/memoria",
+        "url": "https://backend-sonner.optimizar-ia.com/api/memoria",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -20,7 +20,16 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"mensaje\": {{ JSON.stringify($fromAI('mensaje', 'Comando de búsqueda, ej: \"buscar en materiales: parlantes\" o \"buscar configuracion: CFG-101\"', 'string')) }}\n}",
+        "jsonBody": "{\n  \"mensaje\": \"{mensaje}\"\n}",
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "mensaje",
+              "description": "Comando de busqueda. Ej: 'buscar en materiales: parlantes' o 'buscar configuracion: CFG-101' o 'buscar mixto: equipos para casamiento de 100 personas'.",
+              "type": "string"
+            }
+          ]
+        },
         "options": {}
       },
       "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
@@ -30,12 +39,12 @@
         2416
       ],
       "id": "a1b2c3d4-3001-4001-8001-000000000301",
-      "name": "Agente Memoria",
-      "notes": "Reemplaza el sub-agente Memoria (Gemini + 4 vector stores) por un HTTP Request al backend Python (/api/memoria). El backend tiene LLM propio: Claude primario, OpenAI de reserva, y parser determinista si ambos fallan. Hace embeddings OpenAI + RPC match_documents (determinístico, más rápido y barato).\n\nCONFIGURAR:\n1) url → la URL pública del backend de SONNER (ej: https://api.sonner.optimizar-ia.com/api/memoria).\n2) En el backend, definir env: ANTHROPIC_API_KEY (Claude), OPENAI_API_KEY (reserva + embeddings text-embedding-3-small), SUPABASE_SERVICE_ROLE_KEY y MEMORIA_INTERNAL_KEY.\n3) En n8n, definir el env MEMORIA_INTERNAL_KEY con el mismo valor.\n\nBORRAR los nodos viejos del sub-agente: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', los Output Parser, y los 4 vector stores (materiales/eventos/modelo eventos/informacion_interna) con sus Embeddings."
+      "name": "Memoria",
+      "notes": "Reemplaza el sub-agente Memoria (Gemini + 4 vector stores) por un HTTP Request al backend Python (/api/memoria). El backend tiene LLM propio: Claude primario, OpenAI de reserva, y parser determinista si ambos fallan. Hace embeddings OpenAI + RPC match_documents.\n\nCONFIGURAR:\n1) url ya apunta a backend-sonner.optimizar-ia.com/api/memoria.\n2) En el backend, env: ANTHROPIC_API_KEY (Claude), OPENAI_API_KEY (reserva + embeddings text-embedding-3-small), SUPABASE_SERVICE_ROLE_KEY y MEMORIA_INTERNAL_KEY.\n3) En n8n, definir el env MEMORIA_INTERNAL_KEY con el mismo valor.\n\nIMPORTANTE: el nombre del nodo NO debe tener espacios ni acentos (Claude rechaza el esquema). Por eso se llama 'Memoria'.\n\nBORRAR los nodos viejos del sub-agente: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', los Output Parser, y los 4 vector stores (materiales/eventos/modelo eventos/informacion_interna) con sus Embeddings."
     }
   ],
   "connections": {
-    "Agente Memoria": {
+    "Memoria": {
       "ai_tool": [
         []
       ]
