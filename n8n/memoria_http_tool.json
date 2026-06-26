@@ -19,14 +19,12 @@
           ]
         },
         "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "{\n  \"mensaje\": \"{mensaje}\"\n}",
-        "placeholderDefinitions": {
-          "values": [
+        "specifyBody": "keypair",
+        "bodyParameters": {
+          "parameters": [
             {
               "name": "mensaje",
-              "description": "Comando de busqueda. Ej: 'buscar en materiales: parlantes' o 'buscar configuracion: CFG-101' o 'buscar mixto: equipos para casamiento de 100 personas'.",
-              "type": "string"
+              "value": "={{ $fromAI('mensaje', 'Comando de busqueda. Ej: buscar en materiales: parlantes | buscar configuracion: CFG-101 | buscar mixto: equipos para casamiento de 100 personas', 'string') }}"
             }
           ]
         },
@@ -40,7 +38,7 @@
       ],
       "id": "a1b2c3d4-3001-4001-8001-000000000301",
       "name": "Memoria",
-      "notes": "Reemplaza el sub-agente Memoria (Gemini + 4 vector stores) por un HTTP Request al backend Python (/api/memoria). El backend tiene LLM propio: Claude primario, OpenAI de reserva, y parser determinista si ambos fallan. Hace embeddings OpenAI + RPC match_documents.\n\nCONFIGURAR:\n1) url ya apunta a backend-sonner.optimizar-ia.com/api/memoria.\n2) En el backend, env: ANTHROPIC_API_KEY (Claude), OPENAI_API_KEY (reserva + embeddings text-embedding-3-small), SUPABASE_SERVICE_ROLE_KEY y MEMORIA_INTERNAL_KEY.\n3) En n8n, definir el env MEMORIA_INTERNAL_KEY con el mismo valor.\n\nIMPORTANTE: el nombre del nodo NO debe tener espacios ni acentos (Claude rechaza el esquema). Por eso se llama 'Memoria'.\n\nBORRAR los nodos viejos del sub-agente: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', los Output Parser, y los 4 vector stores (materiales/eventos/modelo eventos/informacion_interna) con sus Embeddings."
+      "notes": "Reemplaza el sub-agente Memoria (Gemini + 4 vector stores) por un HTTP Request al backend Python (/api/memoria). El backend tiene LLM propio: Claude primario, OpenAI de reserva, y parser determinista si ambos fallan.\n\nIMPORTANTE: el body va como par clave-valor (specifyBody=keypair), NO como JSON crudo. Si lo cambias a 'JSON', las llaves del JSON chocan con el detector de placeholders de n8n y Claude rechaza el esquema (Property keys should match pattern). El header Content-Type: application/json hace que igual se envie como JSON {\"mensaje\":\"...\"}.\n\nCONFIGURAR:\n1) url ya apunta a backend-sonner.optimizar-ia.com/api/memoria.\n2) Backend env: ANTHROPIC_API_KEY, OPENAI_API_KEY (embeddings text-embedding-3-small), SUPABASE_SERVICE_ROLE_KEY, MEMORIA_INTERNAL_KEY.\n3) n8n env: MEMORIA_INTERNAL_KEY con el mismo valor.\n\nEl nombre del nodo NO debe tener espacios ni acentos (por eso 'Memoria').\n\nBORRAR los nodos viejos: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', los Output Parser, y los 4 vector stores con sus Embeddings."
     }
   ],
   "connections": {
