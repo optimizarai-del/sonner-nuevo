@@ -2,38 +2,44 @@
   "nodes": [
     {
       "parameters": {
-        "toolDescription": "Bibliotecario tecnico de SONNER. Consulta materiales (stock/equipos), eventos (historico), configuraciones CFG (modelo de eventos) e informacion interna del negocio. Devuelve JSON {origen, encontrado, respuesta}. Comandos validos para el parametro mensaje: 'buscar en materiales: X', 'buscar en eventos: X', 'buscar configuracion: CFG-XXX', 'buscar info interna: X', 'buscar mixto: X'. Lo marcado [INTERNO] (precios/composicion tecnica/politicas) NO se comunica al cliente.",
+        "toolDescription": "Bibliotecario tecnico de SONNER (vector store). Usalo cuando necesites consultar materiales (stock/equipos/cantidades), eventos (historico), configuraciones CFG (modelo de eventos) o informacion interna del negocio. Devuelve JSON {origen, encontrado, respuesta} con datos VERBATIM (sin alucinar). Pasale el comando: 'buscar en materiales: X', 'buscar en eventos: X', 'buscar configuracion: CFG-XXX', 'buscar info interna: X', 'buscar mixto: X'. Lo marcado [INTERNO] (precios/composicion tecnica/politicas) NO se comunica al cliente.",
         "method": "POST",
-        "url": "https://backend-sonner.optimizar-ia.com/api/memoria?mensaje={mensaje}",
+        "url": "https://backend-sonner.optimizar-ia.com/api/memoria",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "X-Memoria-Key",
               "value": "={{ $env.MEMORIA_INTERNAL_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
             }
           ]
         },
-        "placeholderDefinitions": {
-          "values": [
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
             {
               "name": "mensaje",
-              "description": "Comando de busqueda: 'buscar en materiales: parlantes', 'buscar configuracion: CFG-101', 'buscar en eventos: casamientos', 'buscar info interna: reserva', 'buscar mixto: equipos para 100 personas'.",
-              "type": "string"
+              "value": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('parameters0_Value', `Comando de busqueda para el bibliotecario. Reformula lo que necesites en uno de estos formatos: 'buscar en materiales: parlantes', 'buscar configuracion: CFG-101', 'buscar en eventos: casamientos', 'buscar info interna: reserva', 'buscar mixto: equipos para un casamiento de 100 personas'.`, 'string') }}"
             }
           ]
         },
-        "options": {}
+        "options": {
+          "timeout": 120000
+        }
       },
-      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
-      "typeVersion": 1.1,
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.4,
       "position": [
         28384,
         2416
       ],
       "id": "a1b2c3d4-3001-4001-8001-000000000301",
       "name": "Memoria",
-      "notes": "Sub-agente Memoria via HTTP al backend Python (/api/memoria). Claude primario, OpenAI de reserva, parser determinista de respaldo.\n\nMECANISMO en n8n 2.26.8: el comando va en la URL como query param ?mensaje={mensaje}. n8n solo reconoce los placeholders {..} dentro de la URL (no en el body keypair, y el body JSON colisiona con sus llaves). El backend acepta 'mensaje' tanto por query como por body.\n\nCONFIGURAR:\n1) url ya apunta a backend-sonner.optimizar-ia.com/api/memoria?mensaje={mensaje}.\n2) Backend env: ANTHROPIC_API_KEY, OPENAI_API_KEY (embeddings text-embedding-3-small), SUPABASE_SERVICE_ROLE_KEY, MEMORIA_INTERNAL_KEY.\n3) n8n env: MEMORIA_INTERNAL_KEY con el mismo valor.\n\nNombre del nodo sin espacios ni acentos (por eso 'Memoria').\n\nBORRAR los nodos viejos: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', Output Parser, y los 4 vector stores con sus Embeddings."
+      "notes": "Sub-agente Memoria via HTTP al backend Python (/api/memoria). Claude primario, OpenAI de reserva, parser determinista de respaldo. Mismo patron que el nodo 'memorias_python' de babilonia (httpRequestTool v4.4 + fromAI override).\n\nLa X-Memoria-Key esta hardcodeada en el header (igual que babilonia). Debe coincidir con la env MEMORIA_INTERNAL_KEY del backend.\n\nBackend env: ANTHROPIC_API_KEY, OPENAI_API_KEY (embeddings text-embedding-3-small), SUPABASE_SERVICE_ROLE_KEY, MEMORIA_INTERNAL_KEY.\n\nBORRAR los nodos viejos: 'Agente Memoria' (agentTool), 'Google Gemini Chat Model3', Output Parser, y los 4 vector stores con sus Embeddings."
     }
   ],
   "connections": {
