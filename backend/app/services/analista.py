@@ -8,6 +8,7 @@ import anthropic
 
 from ..config import settings
 from . import credentials
+from . import analista_memoria as memoria
 from .analytics import TOOLS, TOOL_FNS
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,20 @@ Tenés acceso a estas herramientas (todas son de SOLO LECTURA contra Supabase):
 - stats_blocklist        → cuántos números están bloqueados
 - stats_crm              → distribución de leads por etapa + pipeline activo
 - stats_chat_externo     → tamaño total de la memoria del agente externo
+- stats_csm              → feedback de Gabi sobre las respuestas del agente (good/mejorable/bad, tasa, tags, por tipo)
+- listar_csm             → casos concretos del feedback (mensaje, respuesta, corrección, rating, nota)
+- listar_tablas          → DESCUBRIR todas las tablas de la base con sus filas
+- consultar_tabla        → leer CUALQUIER tabla (columnas, orden, filtro de igualdad)
+- contar_tabla           → contar filas de cualquier tabla
+
+ACCESO TOTAL A LA BASE: si te preguntan por datos que no cubren las herramientas
+dedicadas, NO te rindas: usá `listar_tablas` para ver qué hay y después
+`consultar_tabla`/`contar_tabla` para traer lo que necesites. Para preguntas sobre
+la calidad del agente o el feedback de Gabi, usá `stats_csm` y `listar_csm`.
+
+MEMORIA: recordás los mensajes anteriores de esta misma conversación con el usuario.
+Si hace una repregunta ("¿y el mes pasado?", "dame más detalle"), interpretala en
+el contexto de lo que ya hablaron.
 
 REGLAS:
 1. Si te preguntan algo que requiere datos, USÁ una o más herramientas. NUNCA inventes
@@ -74,11 +89,14 @@ Fecha actual: {fecha}
 MAX_QUESTION_LEN = 600
 
 
-def consultar(question: str) -> str:
+def consultar(question: str, username: str | None = None) -> str:
     """
     Recibe una pregunta del usuario y devuelve la respuesta del Analista IA.
     Loop estándar de tool use con Anthropic. Nunca propaga excepciones: ante
     cualquier falla devuelve un mensaje claro para el usuario.
+
+    Si se pasa `username`, carga el historial reciente de ese usuario como
+    contexto y persiste la pregunta + respuesta al terminar.
     """
     # Validación de input
     question = (question or "").strip()
@@ -95,8 +113,17 @@ def consultar(question: str) -> str:
     fecha = datetime.now().strftime("%Y-%m-%d %H:%M")
     system = SYSTEM_PROMPT.format(fecha=fecha)
 
-    messages: list[dict] = [{"role": "user", "content": question}]
+    # Historial reciente como contexto (solo texto user/assistant, sin tool calls)
+    messages: list[dict] = []
+    if username:
+        messages.extend(memoria.cargar(username))
+    messages.append({"role": "user", "content": question})
     max_iters = 8
+
+    def _persistir(answer: str) -> None:
+        if username and answer:
+            memoria.guardar(username, "user", question)
+            memoria.guardar(username, "assistant", answer)
 
     for i in range(max_iters):
         try:
@@ -118,6 +145,7 @@ def consultar(question: str) -> str:
         if resp.stop_reason == "end_turn":
             for block in resp.content:
                 if hasattr(block, "text"):
+                    _persistir(block.text)
                     return block.text
             return ""
 
