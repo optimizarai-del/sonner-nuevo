@@ -1,9 +1,19 @@
 import { useState, useEffect } from "react";
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { MessageSquare, FileText, Shield, Activity, TrendingUp, RefreshCw } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { MessageSquare, FileText, Shield, Activity, Users, RefreshCw } from "lucide-react";
 import { supabase } from "../utils/supabase";
-import { format, subDays, startOfDay } from "date-fns";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
+
+// Sesiones que NO son contactos reales (estados de WhatsApp, keep-alive, tests web)
+function esContactoReal(sid) {
+  if (!sid) return false;
+  const s = String(sid).trim().toLowerCase();
+  if (["+status", "status", "healthcheck", "test"].includes(s) || s.startsWith("web-") || s.startsWith("test")) return false;
+  return (s.match(/\d/g) || []).length >= 8; // parece un teléfono
+}
+// Muestra el teléfono un poco acortado para la etiqueta del gráfico
+const shortTel = (s) => (String(s).length > 8 ? "…" + String(s).slice(-8) : String(s));
 
 function KpiCard({ icon: Icon, label, value, sub, color = "#2B6BF3" }) {
   return (
@@ -49,43 +59,43 @@ export default function Dashboard() {
     try {
       const now = new Date();
       const mesInicio = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const hace30    = subDays(now, 30).toISOString();
 
       const [
         { count: totalContratos },
         { count: mesContratos },
         { count: totalBloqueados },
-        { count: totalMensajes },
-        { data: chatsRecientes },
+        { data: chatSesiones },
         { data: contratosRecientes },
       ] = await Promise.all([
         supabase.from("contratos").select("*", { count: "exact", head: true }),
         supabase.from("contratos").select("*", { count: "exact", head: true }).gte("created_at", mesInicio),
         supabase.from("blocklist").select("*", { count: "exact", head: true }),
-        // Mensajes EXTERNOS (agente WhatsApp)
-        supabase.from("external_chat_histories").select("*", { count: "exact", head: true }),
-        // Volumen por día desde whatsapp_messages
-        supabase.from("whatsapp_messages").select("created_at").gte("created_at", hace30).order("created_at"),
+        // Conversaciones del agente principal (Tomi). La tabla no tiene fecha, así que
+        // no hay serie temporal: agrupamos por contacto (session_id).
+        supabase.from("n8n_chat_histories").select("session_id"),
         supabase.from("contratos").select("nombre_prestatario, lugar_evento, dia_evento, created_at").order("created_at", { ascending: false }).limit(5),
       ]);
 
+      // Tally por contacto real (filtrando estados/keep-alive/tests)
+      const porContacto = {};
+      let mensajesReales = 0;
+      for (const row of (chatSesiones ?? [])) {
+        if (!esContactoReal(row.session_id)) continue;
+        porContacto[row.session_id] = (porContacto[row.session_id] || 0) + 1;
+        mensajesReales++;
+      }
+      const top = Object.entries(porContacto)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([contacto, mensajes]) => ({ contacto: shortTel(contacto), mensajes }));
+
       setStats({
         contratos: { total: totalContratos ?? 0, mes: mesContratos ?? 0 },
-        mensajes:  totalMensajes ?? 0,
+        mensajes:  mensajesReales,
+        contactos: Object.keys(porContacto).length,
         bloqueados: totalBloqueados ?? 0,
       });
-
-      // Agrupar chats por día
-      const byDay = {};
-      for (let i = 0; i < 30; i++) {
-        const d = format(subDays(now, 29 - i), "dd/MM");
-        byDay[d] = 0;
-      }
-      for (const row of (chatsRecientes ?? [])) {
-        const d = format(new Date(row.created_at), "dd/MM");
-        if (d in byDay) byDay[d]++;
-      }
-      setChart(Object.entries(byDay).map(([dia, mensajes]) => ({ dia, mensajes })));
+      setChart(top);
       setRecent(contratosRecientes ?? []);
 
     } catch (e) {
@@ -98,9 +108,9 @@ export default function Dashboard() {
 
   const kpis = stats ? [
     { icon: FileText,      label: "Contratos generados",  value: stats.contratos.total, sub: `${stats.contratos.mes} este mes`,       color: "#3FB950" },
-    { icon: MessageSquare, label: "Mensajes externos",      value: stats.mensajes,        sub: "Memoria del agente WhatsApp",            color: "#25D366" },
+    { icon: MessageSquare, label: "Mensajes del agente",   value: stats.mensajes,        sub: "Conversaciones WhatsApp (Tomi)",         color: "#25D366" },
+    { icon: Users,         label: "Contactos únicos",      value: stats.contactos,       sub: "Personas que escribieron al agente",     color: "#2B6BF3" },
     { icon: Shield,        label: "Contactos bloqueados",  value: stats.bloqueados,      sub: "Lista de bloqueo agente externo",         color: "#F85149" },
-    { icon: Activity,      label: "Agentes activos",       value: 2,                     sub: "Chat interno · Agente externo",           color: "#D29922" },
   ] : [];
 
   return (
@@ -137,26 +147,26 @@ export default function Dashboard() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-        {/* Mensajes últimos 30 días */}
+        {/* Contactos más activos */}
         <div className="lg:col-span-2 card p-5">
           <h2 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
-            <TrendingUp size={14} style={{ color: "#2B6BF3" }} />
-            Mensajes por día (30 días)
+            <Users size={14} style={{ color: "#2B6BF3" }} />
+            Contactos más activos (agente WhatsApp)
           </h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <AreaChart data={chart} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gradMsg" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%"  stopColor="#2B6BF3" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#2B6BF3" stopOpacity={0}   />
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="dia" tick={{ fill: "#484F58", fontSize: 10 }} tickLine={false} axisLine={false} interval={4} />
-              <YAxis tick={{ fill: "#484F58", fontSize: 10 }} tickLine={false} axisLine={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="mensajes" name="Mensajes" stroke="#2B6BF3" strokeWidth={2} fill="url(#gradMsg)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
+          {chart.length === 0 ? (
+            <p className="text-xs text-center py-16" style={{ color: "#484F58" }}>Sin conversaciones registradas.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={chart} layout="vertical" margin={{ top: 0, right: 12, left: 8, bottom: 0 }}>
+                <XAxis type="number" tick={{ fill: "#484F58", fontSize: 10 }} tickLine={false} axisLine={false} />
+                <YAxis type="category" dataKey="contacto" width={78} tick={{ fill: "#8B949E", fontSize: 11 }} tickLine={false} axisLine={false} />
+                <Tooltip content={<CustomTooltip />} cursor={{ fill: "#ffffff08" }} />
+                <Bar dataKey="mensajes" name="Mensajes" radius={[0, 4, 4, 0]}>
+                  {chart.map((_, i) => <Cell key={i} fill="#2B6BF3" />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
 
         {/* Últimos contratos */}

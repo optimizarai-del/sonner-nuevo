@@ -81,43 +81,83 @@ def listar_contratos(limit: int = 5) -> list[dict]:
     return res.data or []
 
 
-def stats_whatsapp(dias: int = 30) -> dict[str, Any]:
-    """Stats del agente WhatsApp en los últimos N días."""
-    sb = get_supabase()
-    desde = _iso_dias(dias)
+# Tablas de historial de chat del agente (LangChain/n8n): columnas id, session_id, message(jsonb).
+# El session_id es el teléfono del contacto; message.type ∈ {human, ai, tool}.
+# OJO: estas tablas NO tienen timestamp, así que las stats son HISTÓRICAS (no por período).
+CHAT_TABLE_PRINCIPAL = "n8n_chat_histories"       # agente principal (Tomi)
+CHAT_TABLE_EXTERNO   = "external_chat_histories"  # agente externo
 
-    q_in   = sb.table("whatsapp_messages").select("id", count="exact").eq("direction", "in").gte("created_at", desde).execute()
-    q_out  = sb.table("whatsapp_messages").select("id", count="exact").eq("direction", "out").gte("created_at", desde).execute()
-    q_hoy  = sb.table("whatsapp_messages").select("id", count="exact").gte("created_at", datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()).execute()
 
-    contactos = sb.table("whatsapp_messages").select("contacto").gte("created_at", desde).execute()
-    unicos = len({r["contacto"] for r in (contactos.data or []) if r.get("contacto")})
+def _chat_rows(tabla: str) -> list[dict]:
+    sb = _admin()
+    return sb.table(tabla).select("session_id, message").execute().data or []
 
+
+# Sesiones que NO son contactos reales (estados de WhatsApp, keep-alive, tests web).
+_SESIONES_SISTEMA = {"+status", "status", "healthcheck", "test"}
+
+
+def _es_contacto_real(session_id: str | None) -> bool:
+    """True si la sesión parece un teléfono real (no un estado/keep-alive/test web)."""
+    if not session_id:
+        return False
+    s = session_id.strip().lower()
+    if s in _SESIONES_SISTEMA or s.startswith("web-") or s.startswith("test"):
+        return False
+    # teléfono: mayormente dígitos (con + opcional), al menos 8 cifras
+    digitos = sum(c.isdigit() for c in s)
+    return digitos >= 8
+
+
+def _resumen_chat(rows: list[dict]) -> dict[str, Any]:
+    recibidos = enviados = 0
+    contactos: set = set()
+    for r in rows:
+        if not _es_contacto_real(r.get("session_id")):
+            continue  # descartar estados de WhatsApp, keep-alive y tests
+        msg = r.get("message") or {}
+        tipo = msg.get("type")
+        contactos.add(r["session_id"])
+        if tipo == "human":
+            recibidos += 1
+        elif tipo == "ai" and "respuesta" in (msg.get("content") or ""):
+            # solo contamos las respuestas reales al cliente (no los pasos de tool)
+            enviados += 1
     return {
-        "recibidos":           q_in.count or 0,
-        "enviados":            q_out.count or 0,
-        "total":               (q_in.count or 0) + (q_out.count or 0),
-        "intercambios_hoy":    q_hoy.count or 0,
-        "contactos_unicos":    unicos,
-        "tasa_respuesta_pct":  round((q_out.count or 0) / (q_in.count or 1) * 100, 1) if q_in.count else 0,
+        "recibidos": recibidos,
+        "enviados": enviados,
+        "contactos_unicos": len(contactos),
+        "conversaciones": len(contactos),
+        "tasa_respuesta_pct": round(enviados / recibidos * 100, 1) if recibidos else 0,
+        "nota": "Histórico total: la tabla de conversaciones no guarda fecha, no hay corte por período.",
     }
 
 
+def stats_whatsapp(dias: int = 30) -> dict[str, Any]:
+    """Stats históricas del agente WhatsApp principal (Tomi): mensajes recibidos,
+    respuestas enviadas, contactos únicos y tasa de respuesta. El parámetro 'dias'
+    se ignora: la tabla de conversaciones no guarda fecha."""
+    try:
+        return _resumen_chat(_chat_rows(CHAT_TABLE_PRINCIPAL))
+    except Exception as e:
+        logger.warning("stats_whatsapp falló: %s", e)
+        return {"error": str(e)}
+
+
 def top_contactos_whatsapp(dias: int = 30, limit: int = 5) -> list[dict]:
-    """Contactos con más mensajes intercambiados."""
-    sb = get_supabase()
-    res = sb.table("whatsapp_messages").select("contacto, contacto_nombre").gte("created_at", _iso_dias(dias)).execute()
-    counts: dict[str, dict] = {}
-    for r in (res.data or []):
-        k = r.get("contacto")
-        if not k:
-            continue
-        if k not in counts:
-            counts[k] = {"contacto": k, "nombre": r.get("contacto_nombre"), "total": 0}
-        counts[k]["total"] += 1
-        if r.get("contacto_nombre"):
-            counts[k]["nombre"] = r["contacto_nombre"]
-    return sorted(counts.values(), key=lambda x: x["total"], reverse=True)[:limit]
+    """Contactos (teléfonos) con más mensajes intercambiados con el agente principal."""
+    try:
+        rows = _chat_rows(CHAT_TABLE_PRINCIPAL)
+    except Exception as e:
+        logger.warning("top_contactos_whatsapp falló: %s", e)
+        return []
+    counts: dict[str, int] = {}
+    for r in rows:
+        k = r.get("session_id")
+        if _es_contacto_real(k):
+            counts[k] = counts.get(k, 0) + 1
+    ordenados = sorted(counts.items(), key=lambda x: x[1], reverse=True)[:limit]
+    return [{"contacto": k, "total": n} for k, n in ordenados]
 
 
 def stats_blocklist() -> dict[str, int]:
@@ -151,14 +191,18 @@ def stats_crm() -> dict[str, Any]:
 
 
 def stats_chat_externo(dias: int = 30) -> dict[str, Any]:
-    """Mensajes y conversaciones del agente WhatsApp (memoria)."""
-    sb = get_supabase()
-    total = sb.table("external_chat_histories").select("id", count="exact").execute()
-    sesiones = sb.table("external_chat_histories").select("session_id").execute()
-    unicos = len({r.get("session_id") for r in (sesiones.data or []) if r.get("session_id")})
+    """Mensajes y conversaciones del AGENTE EXTERNO (histórico total)."""
+    try:
+        rows = _chat_rows(CHAT_TABLE_EXTERNO)
+    except Exception as e:
+        logger.warning("stats_chat_externo falló: %s", e)
+        return {"error": str(e)}
+    r = _resumen_chat(rows)
     return {
-        "mensajes_totales":    total.count or 0,
-        "conversaciones":       unicos,
+        "mensajes_totales": len(rows),
+        "conversaciones": r["conversaciones"],
+        "recibidos": r["recibidos"],
+        "enviados": r["enviados"],
     }
 
 
@@ -288,7 +332,7 @@ TOOLS = [
     },
     {
         "name": "stats_whatsapp",
-        "description": "Estadísticas del agente WhatsApp: mensajes recibidos, enviados, intercambios hoy, contactos únicos, tasa de respuesta. Usa los últimos N días.",
+        "description": "Estadísticas HISTÓRICAS del agente WhatsApp principal (Tomi): mensajes recibidos, respuestas enviadas, contactos únicos y tasa de respuesta. Es histórico total (la tabla de conversaciones no guarda fecha), así que no hay corte por período.",
         "input_schema": {
             "type": "object",
             "properties": {"dias": {"type": "integer", "default": 30}},
@@ -296,7 +340,7 @@ TOOLS = [
     },
     {
         "name": "top_contactos_whatsapp",
-        "description": "Contactos de WhatsApp con más mensajes intercambiados en los últimos N días.",
+        "description": "Contactos (teléfonos) con más mensajes intercambiados con el agente principal (histórico total).",
         "input_schema": {
             "type": "object",
             "properties": {
@@ -317,7 +361,7 @@ TOOLS = [
     },
     {
         "name": "stats_chat_externo",
-        "description": "Cantidad de mensajes en la memoria del agente WhatsApp y conversaciones únicas.",
+        "description": "Mensajes y conversaciones del AGENTE EXTERNO (histórico total): mensajes totales, conversaciones únicas, recibidos y enviados.",
         "input_schema": {
             "type": "object",
             "properties": {"dias": {"type": "integer", "default": 30}},
