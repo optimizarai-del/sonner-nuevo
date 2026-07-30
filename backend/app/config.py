@@ -46,6 +46,21 @@ class Settings(BaseSettings):
     MEMORIA_TOPK: int = 5
     MEMORIA_MIN_SIMILARITY: float = 0.30
 
+    # ── Agente externo (Tomi / WhatsApp YCloud) ──────────────────────────────
+    # Secretos: se leen con credentials.get() (app_settings/env). Acá solo defaults vacíos.
+    YCLOUD_API_KEY: str = ""
+    YCLOUD_WEBHOOK_SECRET: str = ""          # para verificar 'ycloud-signature' (opcional)
+    YCLOUD_SEND_URL: str = "https://api.ycloud.com/v2/whatsapp/messages/sendDirectly"
+    # Aviso de leads a Gabi por Telegram
+    TELEGRAM_BOT_TOKEN: str = ""             # bot que avisa a Gabi
+    GABI_TELEGRAM_CHAT_ID: str = "6124095544"
+    # Google Calendar/Sheets (IDs no secretos; credenciales reusan el OAuth de contratos)
+    GCAL_EVENTOS_ID: str = "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com"
+    GCAL_REUNIONES_ID: str = "30d150a3b5a1a2cf4c6be2c41fe021c1410ac95f9bf1ffc1ed538a39ed680201@group.calendar.google.com"
+    GSHEET_SALONES_ID: str = "1UC2rPEx0YNvaE3rrSVpZ-tgSTcQKEj9GF5yyJIx13VU"
+    # Buffer/debounce de mensajes entrantes (segundos). n8n usaba 15s.
+    WA_BUFFER_SECONDS: float = 15.0
+
     # ── Auth (JWT) ────────────────────────────────────────────────────────────
     JWT_SECRET: str = _DEFAULT_JWT_SECRET
     JWT_ALGORITHM: str = "HS256"
