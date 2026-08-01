@@ -12,6 +12,7 @@ Arranque:
     uvicorn app.agente_main:app --host 0.0.0.0 --port 8000 --workers 1
 """
 import logging
+import sys
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,7 +20,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .routers import agente_externo, wa_externo
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+# stream=stdout + force=True: aseguran salida capturable por Docker/EasyPanel aunque
+# uvicorn haya configurado logging antes (sin esto el panel de logs queda mudo).
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+    force=True,
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
