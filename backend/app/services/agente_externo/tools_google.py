@@ -21,11 +21,10 @@ from .. import credentials as creds
 log = logging.getLogger("agente_externo.tools_google")
 
 _TZ_AR = timezone(timedelta(hours=-3))
+# El agente solo LEE Calendar y Sheets. Scopes mínimos (menos fricción de consent).
 _SCOPES = [
     "https://www.googleapis.com/auth/calendar.readonly",
     "https://www.googleapis.com/auth/spreadsheets.readonly",
-    "https://www.googleapis.com/auth/drive",
-    "https://www.googleapis.com/auth/documents",
 ]
 
 
@@ -57,7 +56,10 @@ def diagnostico_google() -> dict[str, Any]:
 
 
 def _credentials() -> Credentials:
-    refresh_token = creds.get("GOOGLE_REFRESH_TOKEN", settings.GOOGLE_REFRESH_TOKEN)
+    # Token propio del agente (Calendar+Sheets); si no está, cae al de contratos
+    # (que NO tiene esos scopes → seguirá fallando hasta cargar el token correcto).
+    refresh_token = (creds.get("GOOGLE_AGENT_REFRESH_TOKEN", settings.GOOGLE_AGENT_REFRESH_TOKEN)
+                     or creds.get("GOOGLE_REFRESH_TOKEN", settings.GOOGLE_REFRESH_TOKEN))
     client_id = creds.get("GOOGLE_CLIENT_ID", settings.GOOGLE_CLIENT_ID)
     client_secret = creds.get("GOOGLE_CLIENT_SECRET", settings.GOOGLE_CLIENT_SECRET)
     if not (refresh_token and client_id and client_secret):

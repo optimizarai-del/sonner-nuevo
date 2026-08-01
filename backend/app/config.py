@@ -54,7 +54,9 @@ class Settings(BaseSettings):
     # Aviso de leads a Gabi por Telegram
     TELEGRAM_BOT_TOKEN: str = ""             # bot que avisa a Gabi
     GABI_TELEGRAM_CHAT_ID: str = "6124095544"
-    # Google Calendar/Sheets (IDs no secretos; credenciales reusan el OAuth de contratos)
+    # Google Calendar/Sheets: token propio del agente con scopes Calendar+Sheets.
+    # Si queda vacío, cae al GOOGLE_REFRESH_TOKEN de contratos (que NO tiene esos scopes).
+    GOOGLE_AGENT_REFRESH_TOKEN: str = ""
     GCAL_EVENTOS_ID: str = "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com"
     GCAL_REUNIONES_ID: str = "30d150a3b5a1a2cf4c6be2c41fe021c1410ac95f9bf1ffc1ed538a39ed680201@group.calendar.google.com"
     GSHEET_SALONES_ID: str = "1UC2rPEx0YNvaE3rrSVpZ-tgSTcQKEj9GF5yyJIx13VU"
