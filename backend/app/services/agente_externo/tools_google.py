@@ -29,6 +29,33 @@ _SCOPES = [
 ]
 
 
+def diagnostico_google() -> dict[str, Any]:
+    """Prueba mínima de Calendar + Sheets y devuelve el error CRUDO de Google si falla.
+
+    Sirve para diagnosticar credenciales por HTTP (sin depender del panel de logs).
+    """
+    res: dict[str, Any] = {}
+    try:
+        cal = build("calendar", "v3", credentials=_credentials(), cache_discovery=False)
+        cal.events().list(calendarId=settings.GCAL_EVENTOS_ID, maxResults=1,
+                          timeZone="America/Argentina/Buenos_Aires").execute()
+        res["calendar"] = {"ok": True}
+    except Exception as e:  # noqa: BLE001
+        res["calendar"] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:600]}
+    try:
+        sh = build("sheets", "v4", credentials=_credentials(), cache_discovery=False)
+        sh.spreadsheets().values().get(
+            spreadsheetId=settings.GSHEET_SALONES_ID, range="A1:B2").execute()
+        res["sheets"] = {"ok": True}
+    except Exception as e:  # noqa: BLE001
+        res["sheets"] = {"ok": False, "error": f"{type(e).__name__}: {e}"[:600]}
+    cid = creds.get("GOOGLE_CLIENT_ID", settings.GOOGLE_CLIENT_ID) or ""
+    rt = creds.get("GOOGLE_REFRESH_TOKEN", settings.GOOGLE_REFRESH_TOKEN) or ""
+    res["creds"] = {"client_id_tail": cid[-24:], "has_refresh_token": bool(rt),
+                    "calendar_id": settings.GCAL_EVENTOS_ID, "sheet_id": settings.GSHEET_SALONES_ID}
+    return res
+
+
 def _credentials() -> Credentials:
     refresh_token = creds.get("GOOGLE_REFRESH_TOKEN", settings.GOOGLE_REFRESH_TOKEN)
     client_id = creds.get("GOOGLE_CLIENT_ID", settings.GOOGLE_CLIENT_ID)

@@ -70,6 +70,10 @@ def diag(
     _auth(x_memoria_key)
     out: dict[str, Any] = {}
     try:
+        out["google_diag"] = tools_google.diagnostico_google()
+    except Exception as e:  # noqa: BLE001
+        out["google_diag"] = {"excepcion": str(e)}
+    try:
         out["calendario"] = tools_google.verificar_disponibilidad(
             f"verificar disponibilidad evento {fecha}")
     except Exception as e:  # noqa: BLE001
