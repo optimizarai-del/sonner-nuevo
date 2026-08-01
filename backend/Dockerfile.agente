@@ -5,6 +5,10 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
+# Logs en tiempo real (sin esto, Docker/EasyPanel no captura la salida de Python).
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
