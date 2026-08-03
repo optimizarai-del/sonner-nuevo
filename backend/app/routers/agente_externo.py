@@ -83,11 +83,14 @@ def desde_n8n(body: N8nIn, x_memoria_key: Optional[str] = Header(default=None)) 
         reunion_cliente=reunion,
         persistir=True,
     )
-    return {"output": {
-        "respuesta": contrato.get("respuesta", ""),
-        "comando": contrato.get("comando", "nada"),
-        "mensaje_comando": contrato.get("mensaje_comando"),
-    }}
+    return {
+        "output": {
+            "respuesta": contrato.get("respuesta", ""),
+            "comando": contrato.get("comando", "nada"),
+            "mensaje_comando": contrato.get("mensaje_comando"),
+        },
+        "tipo_cliente": tipo,  # para que el nodo CSM de n8n lo registre bien
+    }
 
 
 @router.get("/diag")

@@ -19,7 +19,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ mensaje: Array.isArray($('Redis7').item.json.mensajes) ? $('Redis7').item.json.mensajes.join(String.fromCharCode(10)) : $('Redis7').item.json.mensajes, telefono: $('Edit Fields2').item.json.usuario, nombre: $('Edit Fields2').item.json.nombre_usuario, tipo_cliente: $('Code in JavaScript').item.json.tipo_cliente, reunion_cliente: $('Armar contexto reunión').item.json.reunion_cliente }) }}",
+        "jsonBody": "={{ JSON.stringify({ mensaje: Array.isArray($('Redis7').item.json.mensajes) ? $('Redis7').item.json.mensajes.join(String.fromCharCode(10)) : $('Redis7').item.json.mensajes, telefono: $('Edit Fields2').item.json.usuario, nombre: $('Edit Fields2').item.json.nombre_usuario, tipo_cliente: $('Code in JavaScript').item.json.tipo_cliente }) }}",
         "options": {
           "timeout": 120000
         }
