@@ -12,7 +12,7 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from ..config import settings
-from ..services.agente_externo import orquestador, tools_google
+from ..services.agente_externo import orquestador, tools_google, supabase_ops
 from ..services.memoria import agente_memoria
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,40 @@ def probar(body: ProbarIn, x_memoria_key: Optional[str] = Header(default=None)) 
         reunion_cliente=body.reunion_cliente.model_dump() if body.reunion_cliente else None,
         persistir=body.persistir,
     )
+
+
+class N8nIn(BaseModel):
+    mensaje: str = Field(..., description="Mensaje del cliente (ya buffizado por n8n).")
+    telefono: str = Field(..., description="Teléfono del cliente (usuario/session id).")
+    nombre: str = Field(default="", description="Nombre del cliente (WhatsApp profile).")
+    tipo_cliente: Optional[str] = Field(default=None, description="minorista|mayorista; si falta, lo calcula el agente.")
+    reunion_cliente: Optional[ReunionCtx] = Field(default=None, description="Si falta, lo calcula el agente.")
+
+
+@router.post("/n8n")
+def desde_n8n(body: N8nIn, x_memoria_key: Optional[str] = Header(default=None)) -> dict[str, Any]:
+    """Cerebro para n8n. n8n recibe/buffiza/envía; esto solo piensa.
+
+    Devuelve {"output": {respuesta, comando, mensaje_comando}} — misma forma que el
+    nodo AI Agent que reemplaza, así los nodos de abajo (trocear/switch/CRM/CSM) no cambian.
+    Si tipo_cliente o reunion_cliente no vienen, los calcula el agente.
+    """
+    _auth(x_memoria_key)
+    tipo = body.tipo_cliente or supabase_ops.tipo_cliente(body.telefono)
+    reunion = body.reunion_cliente.model_dump() if body.reunion_cliente else supabase_ops.contexto_reunion(body.telefono)
+    contrato = orquestador.responder(
+        texto=body.mensaje,
+        telefono=body.telefono,
+        nombre=body.nombre or body.telefono,
+        tipo_cliente=tipo,
+        reunion_cliente=reunion,
+        persistir=True,
+    )
+    return {"output": {
+        "respuesta": contrato.get("respuesta", ""),
+        "comando": contrato.get("comando", "nada"),
+        "mensaje_comando": contrato.get("mensaje_comando"),
+    }}
 
 
 @router.get("/diag")
