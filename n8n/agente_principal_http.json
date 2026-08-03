@@ -1,0 +1,36 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-nuevo-agente-sonner.3buyoj.easypanel.host/api/agente/n8n",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Memoria-Key",
+              "value": "={{ $env.MEMORIA_INTERNAL_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ mensaje: Array.isArray($('Redis7').item.json.mensajes) ? $('Redis7').item.json.mensajes.join(String.fromCharCode(10)) : $('Redis7').item.json.mensajes, telefono: $('Edit Fields2').item.json.usuario, nombre: $('Edit Fields2').item.json.nombre_usuario, tipo_cliente: $('Code in JavaScript').item.json.tipo_cliente, reunion_cliente: $('Armar contexto reunión').item.json.reunion_cliente }) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [28544, 1280],
+      "id": "a9e1f000-0000-4000-8000-agenteprincipal",
+      "name": "AGENTE PRINCIPAL MINORISTA",
+      "notes": "Reemplaza el nodo AI Agent. Le pega al agente en codigo (/api/agente/n8n) y devuelve {output:{respuesta,comando,mensaje_comando}} — misma forma que espera el flujo. n8n sigue recibiendo/buffizando/enviando; el cerebro esta en codigo. X-Memoria-Key: setear MEMORIA_INTERNAL_KEY en las env de n8n, o reemplazar por el valor literal."
+    }
+  ],
+  "connections": {}
+}
