@@ -23,6 +23,22 @@ from .tipos import Herramienta
 
 log = logging.getLogger("agente_core.motor")
 
+# Reintentos extra por proveedor ante errores TRANSITORIOS (sobrecarga, rate-limit,
+# timeouts). Backoff en segundos entre reintentos. El intento inicial no cuenta acá.
+_MAX_REINTENTOS = 1
+_BACKOFF = (1.5, 3.0)
+
+
+def _es_transitorio(e: Exception) -> bool:
+    """True si el error pinta recuperable reintentando (no un error de config/permiso)."""
+    s = f"{type(e).__name__} {e}".lower()
+    marcas = (
+        "overloaded", "overload", "rate limit", "ratelimit", "429", "500", "502",
+        "503", "529", "timeout", "timed out", "connection", "temporarily",
+        "unavailable", "service_unavailable", "internalservererror", "apiconnection",
+    )
+    return any(m in s for m in marcas)
+
 
 # ── Helper: extraer un objeto JSON de la respuesta del LLM ────────────────────
 def extraer_json(texto: str) -> Optional[dict[str, Any]]:
@@ -71,7 +87,7 @@ def _via_anthropic(
 
     if not settings.ANTHROPIC_API_KEY:
         raise RuntimeError("ANTHROPIC_API_KEY no configurada")
-    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=60, max_retries=1)
+    client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY, timeout=45, max_retries=2)
     tools = [
         {"name": h.nombre, "description": h.descripcion, "input_schema": h.parametros}
         for h in herramientas
@@ -133,7 +149,7 @@ def _via_openai(
 
     if not settings.OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY no configurada")
-    client = OpenAI(api_key=settings.OPENAI_API_KEY, timeout=60, max_retries=1)
+    client = OpenAI(api_key=settings.OPENAI_API_KEY, timeout=45, max_retries=2)
     tools = [
         {"type": "function",
          "function": {"name": h.nombre, "description": h.descripcion, "parameters": h.parametros}}
@@ -213,15 +229,22 @@ def responder(
         ("openai", _via_openai, modelo_openai or settings.OPENAI_CHAT_MODEL),
     )
     for proveedor, fn, modelo in drivers:
-        try:
-            texto = fn(system, mensaje, hist, herrs, max_iter, max_tool_calls, max_tokens, modelo)
-            return {
-                "texto": texto,
-                "_meta": {"proveedor": proveedor, "modelo": modelo,
-                          "tiempo_ms": int((time.time() - t0) * 1000), "intentos": intentos},
-            }
-        except Exception as e:  # noqa: BLE001
-            log.warning("motor %s falló: %s", proveedor, e)
-            intentos.append(f"{proveedor}: {e}")
+        for intento in range(1 + _MAX_REINTENTOS):
+            try:
+                texto = fn(system, mensaje, hist, herrs, max_iter, max_tool_calls, max_tokens, modelo)
+                return {
+                    "texto": texto,
+                    "_meta": {"proveedor": proveedor, "modelo": modelo,
+                              "tiempo_ms": int((time.time() - t0) * 1000), "intentos": intentos},
+                }
+            except Exception as e:  # noqa: BLE001
+                transitorio = _es_transitorio(e)
+                log.warning("motor %s intento %d/%d falló (%s): %s", proveedor, intento + 1,
+                            1 + _MAX_REINTENTOS, "transitorio" if transitorio else "definitivo", e)
+                intentos.append(f"{proveedor}#{intento + 1}: {e}")
+                if transitorio and intento < _MAX_REINTENTOS:
+                    time.sleep(_BACKOFF[min(intento, len(_BACKOFF) - 1)])
+                    continue
+                break  # error definitivo o sin reintentos → probar el siguiente proveedor
 
     raise RuntimeError("Todos los proveedores LLM fallaron: " + " | ".join(intentos))

@@ -18,10 +18,13 @@ from .herramientas import construir_herramientas
 
 log = logging.getLogger("agente_externo.orquestador")
 
-# Respuesta segura si el LLM falla del todo o devuelve algo no parseable (Error Fallback n8n).
-_FALLBACK = {
-    "respuesta": "Tuve un problema procesando tu mensaje. Probá de nuevo en unos segundos.",
-    "comando": "nada",
+# Si el LLM falla del todo (los 2 proveedores + reintentos) o no devuelve nada usable,
+# NUNCA le mandamos un error técnico al cliente: derivamos a Gabriel con un mensaje natural
+# (indistinguible de las derivaciones normales) para que un humano tome la conversación.
+_HANDOFF = {
+    "respuesta": ("¡Gracias por tu mensaje! 🙌 Dame un momento que le paso tu consulta a "
+                  "Gabriel y en breve se comunica con vos con todos los detalles."),
+    "comando": "mensaje_gabi",
     "mensaje_comando": None,
 }
 
@@ -62,6 +65,8 @@ def responder(
     system = prompt_mod.construir_system(reunion_cliente=reunion_cliente)
     mensaje = prompt_mod.construir_mensaje(texto, nombre, tipo_cliente)
 
+    contrato: Optional[dict[str, Any]] = None
+    meta: dict[str, Any] = {}
     try:
         out = motor_responder(
             system=system,
@@ -72,15 +77,30 @@ def responder(
             max_tool_calls=8,
             max_tokens=1200,
         )
-        obj = extraer_json(out.get("texto") or "")
-        contrato = _normalizar_contrato(obj) if obj else dict(_FALLBACK)
         meta = out.get("_meta", {})
-        if not obj:
+        crudo = (out.get("texto") or "").strip()
+        obj = extraer_json(crudo)
+        if obj:
+            contrato = _normalizar_contrato(obj)
+        elif crudo and "{" not in crudo and "}" not in crudo:
+            # El LLM contestó en prosa (se olvidó del envoltorio JSON): usamos el texto
+            # tal cual como respuesta en vez de tirarlo. Es una respuesta válida al cliente.
+            contrato = {"respuesta": crudo, "comando": "nada", "mensaje_comando": None}
+            meta["parse_prosa"] = True
+        else:
             meta["parse_error"] = True
     except Exception as e:  # noqa: BLE001
         log.warning("orquestador externo falló: %s", e)
-        contrato = dict(_FALLBACK)
         meta = {"error": str(e)}
+
+    # Red de seguridad: si no hay un contrato con respuesta útil, derivamos a Gabriel.
+    # El cliente jamás recibe un error técnico; se registra en _meta para diagnóstico.
+    if not contrato or not contrato.get("respuesta"):
+        lead = nombre if nombre and nombre != telefono else ""
+        contrato = dict(_HANDOFF)
+        contrato["mensaje_comando"] = lead or None
+        meta["degradado_handoff"] = True
+        log.warning("orquestador externo degradado a handoff (tel=%s meta=%s)", telefono, meta)
 
     if persistir and contrato["respuesta"]:
         hist.guardar_usuario(telefono, texto, nombre, tabla=hist.TABLE_EXTERNO)
