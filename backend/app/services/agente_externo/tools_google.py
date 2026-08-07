@@ -58,10 +58,19 @@ def diagnostico_google() -> dict[str, Any]:
 def _credentials() -> Credentials:
     # Token propio del agente (Calendar+Sheets); si no está, cae al de contratos
     # (que NO tiene esos scopes → seguirá fallando hasta cargar el token correcto).
-    refresh_token = (creds.get("GOOGLE_AGENT_REFRESH_TOKEN", settings.GOOGLE_AGENT_REFRESH_TOKEN)
-                     or creds.get("GOOGLE_REFRESH_TOKEN", settings.GOOGLE_REFRESH_TOKEN))
-    client_id = creds.get("GOOGLE_CLIENT_ID", settings.GOOGLE_CLIENT_ID)
-    client_secret = creds.get("GOOGLE_CLIENT_SECRET", settings.GOOGLE_CLIENT_SECRET)
+    agent_rt = creds.get("GOOGLE_AGENT_REFRESH_TOKEN", settings.GOOGLE_AGENT_REFRESH_TOKEN)
+    if agent_rt:
+        # El token del agente está atado al cliente OAuth propio (sonner-calendarios).
+        refresh_token = agent_rt
+        client_id = creds.get("GOOGLE_AGENT_CLIENT_ID", settings.GOOGLE_AGENT_CLIENT_ID) \
+            or creds.get("GOOGLE_CLIENT_ID", settings.GOOGLE_CLIENT_ID)
+        client_secret = creds.get("GOOGLE_AGENT_CLIENT_SECRET", settings.GOOGLE_AGENT_CLIENT_SECRET) \
+            or creds.get("GOOGLE_CLIENT_SECRET", settings.GOOGLE_CLIENT_SECRET)
+    else:
+        # Fallback al cliente/token de contratos (sin scopes Calendar/Sheets: fallará).
+        refresh_token = creds.get("GOOGLE_REFRESH_TOKEN", settings.GOOGLE_REFRESH_TOKEN)
+        client_id = creds.get("GOOGLE_CLIENT_ID", settings.GOOGLE_CLIENT_ID)
+        client_secret = creds.get("GOOGLE_CLIENT_SECRET", settings.GOOGLE_CLIENT_SECRET)
     if not (refresh_token and client_id and client_secret):
         raise RuntimeError("Credenciales de Google incompletas")
     return Credentials(
