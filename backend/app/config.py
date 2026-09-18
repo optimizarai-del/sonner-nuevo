@@ -62,10 +62,11 @@ class Settings(BaseSettings):
     GCAL_REUNIONES_ID: str = "30d150a3b5a1a2cf4c6be2c41fe021c1410ac95f9bf1ffc1ed538a39ed680201@group.calendar.google.com"
     GSHEET_SALONES_ID: str = "1UC2rPEx0YNvaE3rrSVpZ-tgSTcQKEj9GF5yyJIx13VU"
     # Calendarios de terceros que el agente interno SOLO lee (fiestas tijereta / cromo).
-    GCAL_TIJERETA_ID: str = ""
-    GCAL_CROMO_ID: str = ""
+    # IDs tomados del workflow n8n AGT-INTERNO-SONNER (no son secretos).
+    GCAL_TIJERETA_ID: str = "d95fa5d49e6e2ed2e68d81665f5974880bed1093fc38493a5d15764389d71bd2@group.calendar.google.com"
+    GCAL_CROMO_ID: str = "8ta8sn3o0gpt07utaaojf643m4@group.calendar.google.com"
     # Planilla de DJs (FECHA | TIPO | SALON | DJ | VALOR | PAGADO | ASIGNADO POR | OBS).
-    GSHEET_DJS_ID: str = ""
+    GSHEET_DJS_ID: str = "1SAHK-iT6q8OZrfumu0VSrCKXytnm7RxkA1KErChdo9w"
     # Buffer/debounce de mensajes entrantes (segundos). n8n usaba 15s.
     WA_BUFFER_SECONDS: float = 15.0
 

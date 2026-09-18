@@ -614,5 +614,5 @@ Los dos workflows internos (63 y 61 nodos) eran el mismo agente duplicado: cambi
 4. Levantar el servicio Redis y cargar `REDIS_URL` si se quiere más de un worker.
 5. Apuntar el healthcheck de EasyPanel a `/health/ready`.
 6. **Regenerar `GOOGLE_AGENT_REFRESH_TOKEN` con permisos de escritura** (`calendar` y `spreadsheets`, no las variantes `.readonly`). El agente interno crea y borra eventos y escribe en la planilla de DJs; con el token actual eso devuelve 403. En el flujo de refresh token los permisos son los que se otorgaron al generarlo, no los que pide el código.
-7. Cargar `GCAL_TIJERETA_ID`, `GCAL_CROMO_ID` y `GSHEET_DJS_ID` (están en los workflows versionados). Sin ellos el agente interno saltea esos calendarios y avisa en `omitidos`, pero no falla.
+7. ~~Cargar `GCAL_TIJERETA_ID`, `GCAL_CROMO_ID` y `GSHEET_DJS_ID`~~ — ya vienen como default en `config.py`, tomados del workflow de n8n.
 8. Apuntar los workflows internos de n8n a `/api/agente/interno` y `/api/agente/interno/web`, igual que se hizo con el externo.
