@@ -1,6 +1,9 @@
 # Dockerfile de la app STANDALONE del Agente Externo (Tomi).
-# Mismo código que el backend, pero entrypoint = app.agente_main y UN solo worker
-# (el buffer/debounce es en memoria; ver app/agente_main.py).
+# Mismo código que el backend, pero entrypoint = app.agente_main.
+#
+# Workers: con REDIS_URL configurada el debounce y el dedupe son distribuidos y se puede
+# subir WEB_CONCURRENCY. Sin Redis hay que dejarlo en 1 (cada proceso tendría su propio
+# buffer y las respuestas agrupadas se romperían). El log de arranque dice en cuál está.
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -21,5 +24,7 @@ COPY app ./app
 
 EXPOSE 8000
 
-# 1 worker a propósito (buffer en memoria). No agregar --reload en producción.
-CMD ["uvicorn", "app.agente_main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+ENV WEB_CONCURRENCY=1
+
+# No agregar --reload en producción.
+CMD ["sh", "-c", "uvicorn app.agente_main:app --host 0.0.0.0 --port 8000 --workers ${WEB_CONCURRENCY}"]

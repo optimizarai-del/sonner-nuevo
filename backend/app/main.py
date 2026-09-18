@@ -3,13 +3,14 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from . import obs
 from .config import settings
 from .routers import (
     contratos, analista, settings as settings_router, auth as auth_router,
-    csm, memoria, agente_externo, wa_externo,
+    csm, memoria, agente_externo, agente_interno, wa_externo,
 )
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+obs.logs.configurar()
 logger = logging.getLogger(__name__)
 
 app = FastAPI(
@@ -33,7 +34,9 @@ app.include_router(settings_router.router)
 app.include_router(csm.router)
 app.include_router(memoria.router)
 app.include_router(agente_externo.router)
+app.include_router(agente_interno.router)
 app.include_router(wa_externo.router)
+obs.montar(app)  # /health, /health/ready, /health/deps, /metrics
 
 
 @app.get("/")

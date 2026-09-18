@@ -7,6 +7,7 @@ Hace lo que antes hacía n8n:
 4. Sube el PDF a la misma carpeta
 """
 import io
+import logging
 from typing import Any
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -14,6 +15,8 @@ from googleapiclient.http import MediaIoBaseUpload, MediaIoBaseDownload
 
 from ..config import settings
 from . import credentials as creds
+
+logger = logging.getLogger("services.google_drive")
 
 
 SCOPES = [
@@ -141,9 +144,30 @@ def generar_contrato(form: dict[str, Any]) -> dict[str, str]:
     ).execute()
     pdf_id = pdf_file["id"]
 
+    # 5. Compartir el PDF por link. El contrato se le manda al cliente, que no tiene
+    #    acceso al Drive del estudio: sin esto el link que devolvemos no le abre.
+    #    Es lo que hacía el nodo `Share file1` del workflow de n8n.
+    #    OJO: "cualquiera con el link" incluye el DNI y el domicilio del prestatario.
+    #    Solo se comparte el PDF, nunca el Doc editable.
+    compartir_por_link(pdf_id)
+
     return {
         "doc_url": f"https://docs.google.com/document/d/{doc_id}/edit",
         "pdf_url": f"https://drive.google.com/file/d/{pdf_id}/view",
         "doc_id":  doc_id,
         "pdf_id":  pdf_id,
     }
+
+
+def compartir_por_link(file_id: str) -> bool:
+    """Da permiso de lectura a cualquiera con el link. Best-effort: el archivo ya existe."""
+    try:
+        _drive().permissions().create(
+            fileId=file_id,
+            body={"type": "anyone", "role": "reader"},
+            supportsAllDrives=True,
+        ).execute()
+        return True
+    except Exception as e:  # noqa: BLE001
+        logger.warning("no se pudo compartir %s por link: %s", file_id, e)
+        return False

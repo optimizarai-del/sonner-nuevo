@@ -101,8 +101,12 @@ def _parsear(mensaje: str) -> Tuple[List[Optional[str]], str, bool]:
     return [None], msg, True
 
 
-def consultar(mensaje: str, k: Optional[int] = None) -> Dict[str, Any]:
-    """Punto de entrada. Devuelve {origen, encontrado, respuesta} + meta de debug."""
+def consultar(mensaje: str, k: Optional[int] = None, fuente: Optional[str] = None) -> Dict[str, Any]:
+    """Punto de entrada. Devuelve {origen, encontrado, respuesta} + meta de debug.
+
+    `fuente` explícita (la elige el agente principal) evita el parseo del comando:
+    "todas" busca en todo, un valor inválido se ignora y se cae al parser.
+    """
     t0 = time.time()
     k = k or settings.MEMORIA_TOPK
     min_sim = settings.MEMORIA_MIN_SIMILARITY
@@ -111,7 +115,12 @@ def consultar(mensaje: str, k: Optional[int] = None) -> Dict[str, Any]:
         return {"origen": "mixto", "encontrado": "no",
                 "respuesta": "Comando vacío: no se ejecutó ninguna búsqueda."}
 
-    fuentes, query, fue_mixto = _parsear(mensaje)
+    if fuente == "todas":
+        fuentes, query, fue_mixto = [None], mensaje.strip(), True
+    elif fuente in vs.FUENTES_VALIDAS:
+        fuentes, query, fue_mixto = [fuente], mensaje.strip(), False
+    else:
+        fuentes, query, fue_mixto = _parsear(mensaje)
 
     resultados: Dict[str, List[Dict[str, Any]]] = {}
     errores: List[str] = []

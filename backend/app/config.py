@@ -5,9 +5,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
-# Fallback solo para no romper despliegues existentes — definir JWT_SECRET en el entorno.
-_DEFAULT_JWT_SECRET = "sonner_jwt_secret_change_in_production_2026_xyz_abc_123"
-
 
 class Settings(BaseSettings):
     # ── Google ────────────────────────────────────────────────────────────────
@@ -59,16 +56,37 @@ class Settings(BaseSettings):
     # El refresh token queda atado a ESTE cliente OAuth (proyecto sonner-calendarios),
     # distinto al de contratos → por eso el agente usa su propio client_id/secret.
     GOOGLE_AGENT_REFRESH_TOKEN: str = ""
-    GOOGLE_AGENT_CLIENT_ID: str = "976339654479-ha0bsr062c9dcutuklboh496nja1bcvh.apps.googleusercontent.com"
-    GOOGLE_AGENT_CLIENT_SECRET: str = "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"
+    GOOGLE_AGENT_CLIENT_ID: str = ""
+    GOOGLE_AGENT_CLIENT_SECRET: str = ""
     GCAL_EVENTOS_ID: str = "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com"
     GCAL_REUNIONES_ID: str = "30d150a3b5a1a2cf4c6be2c41fe021c1410ac95f9bf1ffc1ed538a39ed680201@group.calendar.google.com"
     GSHEET_SALONES_ID: str = "1UC2rPEx0YNvaE3rrSVpZ-tgSTcQKEj9GF5yyJIx13VU"
+    # Calendarios de terceros que el agente interno SOLO lee (fiestas tijereta / cromo).
+    GCAL_TIJERETA_ID: str = ""
+    GCAL_CROMO_ID: str = ""
+    # Planilla de DJs (FECHA | TIPO | SALON | DJ | VALOR | PAGADO | ASIGNADO POR | OBS).
+    GSHEET_DJS_ID: str = ""
     # Buffer/debounce de mensajes entrantes (segundos). n8n usaba 15s.
     WA_BUFFER_SECONDS: float = 15.0
 
+    # ── Infraestructura del grafo (LangGraph) ─────────────────────────────────
+    # Redis: debounce distribuido. Sin él, el debounce es en memoria y el servicio
+    # queda atado a UN worker (ver app/agents/nodes/debounce.py).
+    REDIS_URL: str = ""
+    SONNER_MAX_ITER: int = 6
+    SONNER_MAX_TOOL_CALLS: int = 8
+    SONNER_LLM_TIMEOUT: int = 45
+    SONNER_LLM_MAX_RETRIES: int = 2
+
+    # ── Observabilidad ────────────────────────────────────────────────────────
+    SONNER_ALERT_ENABLED: bool = True
+    SONNER_ALERT_WINDOW_SECONDS: int = 600
+    # Si queda vacío se usa GABI_TELEGRAM_CHAT_ID; conviene un chat técnico aparte.
+    ALERT_TELEGRAM_CHAT_ID: str = ""
+    SONNER_METRICS_ENABLED: bool = True
+
     # ── Auth (JWT) ────────────────────────────────────────────────────────────
-    JWT_SECRET: str = _DEFAULT_JWT_SECRET
+    JWT_SECRET: str = ""
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_HOURS: int = 8
 
@@ -85,8 +103,17 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-if settings.JWT_SECRET == _DEFAULT_JWT_SECRET:
+if not settings.JWT_SECRET:
+    # Antes había un secret por defecto en el código. Arrancar con un secret público
+    # es peor que no arrancar: cualquiera que lea el repo puede firmar un token válido.
+    raise RuntimeError(
+        "JWT_SECRET no está definido. Generá uno con "
+        "`python -c \"import secrets; print(secrets.token_urlsafe(48))\"` y cargalo "
+        "como variable de entorno antes de arrancar."
+    )
+
+if not (settings.GOOGLE_AGENT_CLIENT_ID and settings.GOOGLE_AGENT_CLIENT_SECRET):
     logger.warning(
-        "SEGURIDAD: JWT_SECRET no está definido en el entorno — se está usando el "
-        "secret por defecto. Configurá la variable de entorno JWT_SECRET en producción."
+        "GOOGLE_AGENT_CLIENT_ID/SECRET sin configurar — las tools de Calendar y Sheets "
+        "van a degradar a derivación humana."
     )

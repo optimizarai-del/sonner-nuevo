@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..obs import alertas
 from ..services import auth
 from ..services.google_drive import generar_contrato
 from ..services.supabase_client import insertar_contrato
@@ -62,6 +63,16 @@ def crear_contrato(
         # No fallamos: el contrato ya está en Drive
         logger.warning("No se pudo guardar en Supabase: %s", e)
 
+    # Aviso a Gabriel. En n8n era un mail; acá va por el mismo canal de Telegram que
+    # ya recibe los leads, para no sumarle el scope de Gmail al cliente OAuth de
+    # contratos. Best-effort: el contrato ya existe, un aviso que falla no lo invalida.
+    alertas.notificar(
+        "contrato generado",
+        f"Prestatario: {form.get('nombre_prestatario')}\n"
+        f"Evento: {form.get('dia_evento')} en {form.get('lugar_evento')}\n"
+        f"PDF: {urls.get('pdf_url')}",
+        clave=f"contrato:{urls.get('pdf_id')}",
+    )
     return urls
 
 

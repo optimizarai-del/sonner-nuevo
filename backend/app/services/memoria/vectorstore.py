@@ -147,6 +147,61 @@ def buscar(
     return out
 
 
+# ── Ingesta ───────────────────────────────────────────────────────────────────
+TAM_CHUNK = 1000
+SOLAPE = 200
+
+
+def trocear(texto: str, tam: int = TAM_CHUNK, solape: int = SOLAPE) -> List[str]:
+    """Corta el texto en chunks con solape, respetando cortes naturales.
+
+    Equivale al Recursive Character Text Splitter de n8n: intenta cortar en el corte
+    más "grande" disponible dentro de la ventana (párrafo → línea → frase → espacio)
+    y solo parte por el medio si no encuentra ninguno.
+    """
+    texto = (texto or "").strip()
+    if not texto:
+        return []
+    if len(texto) <= tam:
+        return [texto]
+
+    chunks: List[str] = []
+    inicio = 0
+    while inicio < len(texto):
+        fin = min(inicio + tam, len(texto))
+        if fin < len(texto):
+            for separador in ("\n\n", "\n", ". ", " "):
+                corte = texto.rfind(separador, inicio + tam // 2, fin)
+                if corte != -1:
+                    fin = corte + len(separador)
+                    break
+        chunk = texto[inicio:fin].strip()
+        if chunk:
+            chunks.append(chunk)
+        if fin >= len(texto):
+            break
+        inicio = max(fin - solape, inicio + 1)
+    return chunks
+
+
+def ingestar(contenido: str, fuente: str, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Trocea, embebe y guarda en `documents`. Devuelve cuántos chunks entraron."""
+    if fuente not in FUENTES_VALIDAS:
+        raise ValueError(f"fuente inválida: {fuente} (válidas: {FUENTES_VALIDAS})")
+    chunks = trocear(contenido)
+    if not chunks:
+        return {"guardados": 0, "fuente": fuente, "motivo": "contenido vacío"}
+
+    base_meta = {"source": fuente, **(metadata or {})}
+    filas = [
+        {"content": chunk, "metadata": {**base_meta, "chunk": i}, "embedding": embeber(chunk)}
+        for i, chunk in enumerate(chunks)
+    ]
+    get_supabase_admin().table("documents").insert(filas).execute()
+    log.info("ingesta a %s: %d chunks", fuente, len(filas))
+    return {"guardados": len(filas), "fuente": fuente}
+
+
 def conteo_por_fuente() -> Dict[str, int]:
     """Debug: cuántos chunks hay por fuente."""
     try:

@@ -10,7 +10,8 @@ import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from ..services.agente_externo import canal_ycloud, flujo
+from ..agents.graphs import externo as grafo_externo
+from ..services.agente_externo import canal_ycloud
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/wa", tags=["agente-externo-wa"])
@@ -32,7 +33,7 @@ async def webhook(request: Request) -> JSONResponse:
     inbound = canal_ycloud.parsear_inbound(body)
     if inbound and inbound.get("usuario"):
         # Fire-and-forget: no bloqueamos la respuesta del webhook.
-        flujo.recibir_async(inbound)
+        grafo_externo.correr_en_background(inbound)
 
     # Siempre 200 rápido (YCloud solo quiere el ack).
     return JSONResponse(status_code=200, content={"respuesta": "procesando"})

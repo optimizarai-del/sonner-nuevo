@@ -1,7 +1,12 @@
 """Router del agente externo Tomi.
 
-Por ahora expone SOLO el endpoint de prueba `POST /api/agente/probar`, que permite
-testear el cerebro por texto (sin YCloud). El webhook real de WhatsApp se agrega en Fase 2.
+- `POST /api/agente/probar` — probar el agente por texto, sin tocar el historial.
+- `POST /api/agente/n8n`    — el relay que llama n8n hoy (modo "relay" del grafo).
+- `GET  /api/agente/diag`   — diagnóstico de las integraciones (Google, memoria).
+
+Los dos primeros corren sobre el grafo de LangGraph (`agents/graphs/externo.py`). El
+contrato de salida de `/n8n` es el mismo de siempre para que los nodos de n8n de abajo
+(trocear, switch, CRM, CSM) no se toquen.
 
 Auth: header `X-Memoria-Key` con MEMORIA_INTERNAL_KEY (reusa el secreto existente).
 """
@@ -11,9 +16,10 @@ from typing import Any, Optional
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from ..agents.graphs import externo as grafo_externo
 from ..config import settings
-from ..services.agente_externo import orquestador, tools_google, supabase_ops
-from ..services.memoria import agente_memoria
+from ..services.agente_externo import tools_google
+from ..services.memoria import memoria as memoria_det
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/agente", tags=["agente-externo"])
@@ -44,14 +50,16 @@ class ProbarIn(BaseModel):
 
 @router.post("/probar")
 def probar(body: ProbarIn, x_memoria_key: Optional[str] = Header(default=None)) -> dict[str, Any]:
-    """Corre el cerebro del agente externo y devuelve {respuesta, comando, mensaje_comando, _meta}."""
+    """Corre el agente y devuelve {respuesta, comando, mensaje_comando, _meta}."""
     _auth(x_memoria_key)
-    return orquestador.responder(
-        texto=body.mensaje,
-        telefono=body.telefono,
+    return grafo_externo.correr(
+        modo="relay",
+        canal="whatsapp",
+        chat_id=body.telefono,
+        mensaje=body.mensaje,
         nombre=body.nombre,
         tipo_cliente=body.tipo_cliente,
-        reunion_cliente=body.reunion_cliente.model_dump() if body.reunion_cliente else None,
+        reunion=body.reunion_cliente.model_dump() if body.reunion_cliente else None,
         persistir=body.persistir,
     )
 
@@ -73,15 +81,14 @@ def desde_n8n(body: N8nIn, x_memoria_key: Optional[str] = Header(default=None)) 
     Si tipo_cliente o reunion_cliente no vienen, los calcula el agente.
     """
     _auth(x_memoria_key)
-    tipo = body.tipo_cliente or supabase_ops.tipo_cliente(body.telefono)
-    reunion = body.reunion_cliente.model_dump() if body.reunion_cliente else supabase_ops.contexto_reunion(body.telefono)
-    contrato = orquestador.responder(
-        texto=body.mensaje,
-        telefono=body.telefono,
+    contrato = grafo_externo.correr(
+        modo="relay",
+        canal="whatsapp",
+        chat_id=body.telefono,
+        mensaje=body.mensaje,
         nombre=body.nombre or body.telefono,
-        tipo_cliente=tipo,
-        reunion_cliente=reunion,
-        persistir=True,
+        tipo_cliente=body.tipo_cliente,
+        reunion=body.reunion_cliente.model_dump() if body.reunion_cliente else None,
     )
     return {
         "output": {
@@ -89,7 +96,7 @@ def desde_n8n(body: N8nIn, x_memoria_key: Optional[str] = Header(default=None)) 
             "comando": contrato.get("comando", "nada"),
             "mensaje_comando": contrato.get("mensaje_comando"),
         },
-        "tipo_cliente": tipo,  # para que el nodo CSM de n8n lo registre bien
+        "tipo_cliente": contrato.get("tipo_cliente"),  # para el nodo CSM de n8n
     }
 
 
@@ -111,20 +118,18 @@ def diag(
     except Exception as e:  # noqa: BLE001
         out["google_diag"] = {"excepcion": str(e)}
     try:
-        out["calendario"] = tools_google.verificar_disponibilidad(
-            f"verificar disponibilidad evento {fecha}")
+        out["calendario"] = tools_google.disponibilidad(fecha)
     except Exception as e:  # noqa: BLE001
         out["calendario"] = {"excepcion": str(e)}
     try:
-        out["salones"] = tools_google.verificar_salon(
-            f"verificar_salon: {salon} para {pax} personas")
+        out["salones"] = tools_google.salon(salon, pax)
     except Exception as e:  # noqa: BLE001
         out["salones"] = {"excepcion": str(e)}
     try:
-        m = agente_memoria.responder("buscar en materiales: parlantes")
+        m = memoria_det.consultar("parlantes", fuente="materiales")
         out["memoria"] = {"encontrado": m.get("encontrado"), "origen": m.get("origen"),
                           "respuesta": (m.get("respuesta") or "")[:300],
-                          "proveedor": (m.get("_meta") or {}).get("proveedor")}
+                          "meta": m.get("_meta")}
     except Exception as e:  # noqa: BLE001
         out["memoria"] = {"excepcion": str(e)}
     return out
