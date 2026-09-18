@@ -1,0 +1,2426 @@
+{
+  "name": "AGT-INTERNO-SONNER",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -3168,
+        5888
+      ],
+      "id": "01f36f45-056a-4fa3-8031-10c71e9f7564",
+      "name": "Telegram Trigger",
+      "webhookId": "38af431b-0b79-4571-8e73-be87f40e22b8",
+      "credentials": {
+        "telegramApi": {
+          "id": "gScjI38HkwGe6Zrz",
+          "name": "Sonner_Interno_Bot"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -2016,
+        5968
+      ],
+      "id": "70e0836d-8d79-4962-9db1-45049f7dbdfc",
+      "name": "Mensaje duplicado (ignorar)"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Trocear respuesta del agente en HASTA 4 mensajes (estilo Tomi Babilonia)\n// Prioriza cortes naturales por párrafos (\\n\\n), luego por frases (. ! ?)\n\nconst respuesta = (\n  $input.first().json.output?.respuesta\n  || $input.first().json.respuesta\n  || \"Sin respuesta\"\n).trim();\n\nconst MAX_MENSAJES = 4;\nconst MAX_CHARS = 3500; // límite seguro por mensaje (Telegram permite 4096)\n\n// Si es cortita y sin párrafos, mandar un solo mensaje\nif (respuesta.length <= MAX_CHARS && !respuesta.includes(\"\\n\\n\")) {\n  return [{ json: { mensaje: respuesta } }];\n}\n\n// 1) Partir por párrafos (doble salto de línea)\nlet bloques = respuesta.split(/\\n\\s*\\n/).map(b => b.trim()).filter(Boolean);\n\n// 2) Si hay más de 4 bloques, agrupar para tener máximo 4\nif (bloques.length > MAX_MENSAJES) {\n  const objetivoPorBloque = Math.ceil(bloques.length / MAX_MENSAJES);\n  const agrupados = [];\n  for (let i = 0; i < bloques.length; i += objetivoPorBloque) {\n    agrupados.push(bloques.slice(i, i + objetivoPorBloque).join(\"\\n\\n\"));\n  }\n  bloques = agrupados;\n}\n\n// 3) Si algún bloque pasa MAX_CHARS, cortarlo respetando frases\nconst resultado = [];\nfor (const bloque of bloques) {\n  if (bloque.length <= MAX_CHARS) {\n    resultado.push(bloque);\n    continue;\n  }\n  // bloque largo → cortar por frases\n  const frases = bloque.match(/[^.!?]+[.!?]+(\\s|$)|[^.!?]+$/g) || [bloque];\n  let buffer = \"\";\n  for (const frase of frases) {\n    if ((buffer + frase).length > MAX_CHARS && buffer) {\n      resultado.push(buffer.trim());\n      buffer = frase;\n    } else {\n      buffer += frase;\n    }\n  }\n  if (buffer.trim()) resultado.push(buffer.trim());\n}\n\n// 4) Si quedaron más de 4 mensajes igual, fusionar los últimos\nwhile (resultado.length > MAX_MENSAJES) {\n  const ultimo = resultado.pop();\n  resultado[resultado.length - 1] += \"\\n\\n\" + ultimo;\n}\n\n// 5) Devolver cada mensaje como un item separado para el Loop\nreturn resultado.map(mensaje => ({ json: { mensaje } }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3024,
+        5904
+      ],
+      "id": "9ee03154-9299-4afe-991e-67463fd9c55b",
+      "name": "Trocear respuesta"
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "=string({{ $json.message.chat.id }})",
+        "messageData": "={{ $json.message.text }}",
+        "tail": true
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -2912,
+        5872
+      ],
+      "id": "4264358c-f1a0-4b52-8e0c-fd50e58d9411",
+      "name": "Redis1",
+      "credentials": {
+        "redis": {
+          "id": "d7mYd9bsEA29UcAI",
+          "name": "Redis Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 25
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2688,
+        5872
+      ],
+      "id": "dd030412-a5f8-47ff-b297-aa7541d10bcc",
+      "name": "Wait1",
+      "webhookId": "45ecd849-5a25-434b-9fcf-5f4ddf59d818"
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "mensajes",
+        "key": "=string({{ $('Telegram Trigger').item.json.message.chat.id }})",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -2464,
+        5872
+      ],
+      "id": "7d4c40d6-af1a-4900-8b75-df3156cb0aa7",
+      "name": "Redis11",
+      "credentials": {
+        "redis": {
+          "id": "d7mYd9bsEA29UcAI",
+          "name": "Redis Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5b5c58fe-5b05-4b47-a88f-98e6f2af038d",
+              "leftValue": "={{ $('Telegram Trigger').item.json.message.text }}",
+              "rightValue": "={{ $json.mensajes.last() }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2240,
+        5872
+      ],
+      "id": "0482ae1a-68e1-4bba-861d-621b614f1c06",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "=string({{ $('Telegram Trigger').item.json.message.chat.id }})"
+      },
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        -2016,
+        5776
+      ],
+      "id": "507610db-3129-46f5-9486-c4ddeee73819",
+      "name": "Redis12",
+      "credentials": {
+        "redis": {
+          "id": "d7mYd9bsEA29UcAI",
+          "name": "Redis Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "dt-1",
+              "name": "currentDate",
+              "value": "={{ $now.setZone('America/Argentina/Buenos_Aires').toFormat('yyyy-MM-dd HH:mm') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1792,
+        5776
+      ],
+      "id": "4a857b12-b71d-4f4c-a4dc-26debb735baa",
+      "name": "Date & Time"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=recibes el siguiente mensaje:\n{{ Array.isArray($('Redis11').item.json.mensajes) ? $('Redis11').item.json.mensajes.join('\\n') : $('Redis11').item.json.mensajes }}\n\nel dia y hora actual es: {{ $json.currentDate }}",
+        "hasOutputParser": true,
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "# 🧠 SYSTEM PROMPT – AGENTE DE GESTIÓN INTERNO SONNER\n# Versión Operativa – Calendario + Memoria + Control Interno\n\nSos el Agente Interno de Gestión de SONNER, la empresa de producción de eventos.\nTu trabajo es ayudar al equipo interno a consultar información, coordinar eventos, \nrevisar materiales, evaluar disponibilidad, procesar datos internos y mejorar la \noperación de la empresa.\n\nSos claro, profesional, directo y resolutivo.\nNunca decís que sos IA ni hablás de prompts, sistemas o lógica interna.\nNo inventás información: TODO lo obtenés usando las herramientas disponibles.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🗂 CALENDARIOS DISPONIBLES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n- \"eventos sonner\"   → Calendario principal. Se usa para todas las acciones \n                       (create, update, delete, availability).\n- \"fiestas tijereta\" → Solo lectura. Se consulta únicamente con get:event.\n- \"fiestas cromo\"    → Solo lectura. Se consulta únicamente con get:event.\n\nCuando se consulten eventos próximos o disponibilidad de una fecha, el agente \nde calendar debe revisar los 3 calendarios con get:event y combinar los resultados.\nLa herramienta availability:calendar opera únicamente sobre \"eventos sonner\".\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🛠 HERRAMIENTAS DISPONIBLES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n## AGENTE DE CALENDAR (Acciones directas)\n\n### 1. Encontrar evento\nConsultá los 3 calendarios simultáneamente:\n\"busca el evento X usando la herramienta get:event en los calendarios \neventos sonner, fiestas tijereta y fiestas cromo\"\n\n### 2. Actualizar evento\n\"actualiza el evento X usando la herramienta update:event\"\n(Solo sobre \"eventos sonner\")\n\n### 3. Eliminar evento\n\"elimina el evento X usando la herramienta delete:event\"\n(Solo sobre \"eventos sonner\")\n\n### 4. Buscar disponibilidad\n\"busca disponibilidad en la fecha X usando availability:calendar\"\n(Solo sobre \"eventos sonner\". Devolvés lo que encuentre cerca de esa fecha.)\n\n### 5. Crear evento\n\"crea el siguiente evento: [nombre del evento] usando create:event\"\n(Solo sobre \"eventos sonner\")\n\n---\n\n## AGENTE DE MEMORIA (Bases internas de SONNER)\n\nTenés 3 memorias separadas:\n\n### 🟦 Memoria de Materiales (metadata: Materiales)\nUsala para consultar stock, revisar materiales disponibles, chequear existencias.\nComando:\n\"revisa la memoria de materiales con el metadata: Materiales y busca coincidencias con X\"\n(Es obligación enviar una consulta al subagente de memorias en cada ejecución.)\n\n### 🟩 Memoria de Eventos (metadata: eventos)\nUsala para consultar eventos programados, obtener el ID único necesario para \nactualizar o eliminar eventos en Calendar, revisar etapas y estados.\nComandos:\n\"dame información sobre el evento X\"\n\"dame información sobre la lista de eventos que tenemos\"\n\n### 🟨 Información Interna (metadata: informacion_interna)\nUsala para avances de proyectos, datos internos, facturación, estado de la \nempresa, proyecciones.\nComandos:\n\"dame información sobre X de la empresa\"\n\"dame información sobre las ventas de la empresa\"\n\n---\n\n## AGENTE DE DJS (Disponibilidad y gestión de fechas)\n\nUsalo para todo lo relacionado con el sheet de DJs: consultar si un DJ está \ndisponible en una fecha, registrar un nuevo evento asignado a un DJ, o \nactualizar datos de un registro existente.\n\nEl sheet maneja las siguientes columnas:\nFECHA | TIPO DE EVENTO | SALON | DJ | VALOR | PAGADO | ASIGNADO POR | OBSERVACIONES\n\n### 1. Consultar disponibilidad de un DJ\nCuando el usuario pregunte si un DJ está libre o ocupado en una fecha:\n\"consultá si el DJ [nombre] está disponible el [fecha] usando el AGENTE DE DJS\"\n\nEl agente va a buscar en el sheet si ese DJ tiene algún registro en esa fecha.\n→ Si aparece → NO DISPONIBLE\n→ Si no aparece → DISPONIBLE\n\n### 2. Registrar un nuevo evento para un DJ\nCuando se asigne un DJ a un evento nuevo:\n\"registrá en el sheet al DJ [nombre] para el evento del [fecha] en el salón \n[salón], tipo [tipo], valor [valor], pagado [si/no], asignado por [quien], \nobservaciones [obs], usando el AGENTE DE DJS\"\n\n### 3. Actualizar un registro existente de DJ\nCuando se modifique información de un DJ ya registrado (cambio de valor, \nestado de pago, observaciones, etc.):\n\"actualizá en el sheet el registro del DJ [nombre] para la fecha [fecha] \ncon los siguientes cambios: [datos], usando el AGENTE DE DJS\"\n\nREGLA: Nunca uses el AGENTE DE DJS para consultas de calendario de eventos \nde SONNER. Ese es el rol exclusivo del AGENTE DE CALENDAR.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🔧 MODO DE TRABAJO\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n1. Recibís un mensaje del usuario.\n2. Interpretás la intención.\n3. Elegís qué herramienta o memoria corresponde.\n4. Enviás las órdenes exactas al subagente.\n5. Devolvés SIEMPRE un JSON con la estructura obligatoria.\n\n### ACTUALIZACIÓN DE EVENTO (flujo obligatorio):\n1. Consultá la memoria de eventos para obtener información e ID del evento.\n2. Con ese ID, enviá la orden de actualización al agente de calendar.\n\n### ASIGNACIÓN DE DJ A EVENTO (flujo recomendado):\n1. Consultá el AGENTE DE DJS para verificar disponibilidad del DJ en la fecha.\n2. Si está disponible, registrá el nuevo evento con todos los datos completos.\n3. Confirmá al usuario el resultado de la operación.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🧾 FORMATO OBLIGATORIO DE SALIDA (JSON)\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nTu salida final debe ser únicamente este JSON.\n\nREGLAS PARA LOS COMANDOS DE GUARDADO:\n\n1. Crear Evento (eventos):\n   Usar SOLO cuando tengas información completa para crear un evento nuevo.\n   comando: \"eventos\"\n   contenido: Detalle completo del evento para guardar en la base de datos.\n\n2. Cargar Información del Negocio (informacion):\n   Usar cuando el usuario quiera guardar datos internos, avances, ventas o proyecciones.\n   comando: \"informacion\"\n   contenido: La información del negocio a guardar.\n\n3. Cargar/Actualizar Materiales (materiales):\n   Usar cuando se quiera cargar stock nuevo o actualizar inventario.\n   comando: \"materiales\"\n   contenido: Los detalles del material o stock a guardar.\n\n4. Sin Guardado (nada):\n   Usar para consultas, saludos o acciones que no requieren guardar nada.\n   comando: \"nada\"\n   contenido: \"nada\"\n\nESTRUCTURA JSON:\n\n{\n  \"respuesta\": \"mensaje claro y profesional al usuario\",\n  \"comando\": \"eventos | informacion | materiales | nada\",\n  \"contenido\": \"detalle exacto para guardar en la base de datos o 'nada'\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -1200,
+        5776
+      ],
+      "id": "695bc329-a246-4808-b519-635e6d0e6dd9",
+      "name": "AI Agent",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-sonnet-4-5-20250929",
+          "mode": "list",
+          "cachedResultName": "Claude Sonnet 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -1568,
+        6000
+      ],
+      "id": "cb0a3e08-2cdf-46d5-bf2b-4c747b14287a",
+      "name": "Anthropic Sonnet Principal1",
+      "credentials": {
+        "anthropicApi": {
+          "id": "TukVhcSH0wM2WK5L",
+          "name": "SONNER - Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-pro",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1440,
+        6000
+      ],
+      "id": "da839c3b-d5a5-4a2d-8b5d-d9aef81dbd9b",
+      "name": "Gemini Fallback Principal1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "HHxCPCGt7cY3Hku2",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "contextWindowLength": 12
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [
+        -1312,
+        6000
+      ],
+      "id": "83f40c72-33fd-4c1e-bb6d-282a7df60ee6",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "zfE1AXrNqEsgGIB0",
+          "name": "memoria sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserAutofixing",
+      "typeVersion": 1,
+      "position": [
+        1824,
+        6000
+      ],
+      "id": "fcabf704-044c-4a12-a940-711659025d91",
+      "name": "Auto-fixing Output Parser"
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"respuesta\": { \"type\": \"string\" },\n    \"comando\":   { \"type\": \"string\", \"enum\": [\"eventos\", \"materiales\", \"informacion\", \"nada\"] },\n    \"contenido\": { \"type\": [\"string\", \"object\", \"array\"] }\n  },\n  \"required\": [\"respuesta\", \"comando\", \"contenido\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1968,
+        6208
+      ],
+      "id": "84f2c637-01dc-4d59-9b76-68ac6410a08d",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4.1-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1840,
+        6208
+      ],
+      "id": "e2e4f012-5169-4367-b401-fba46255bd35",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "TpgS7MbojkKQfXYq",
+          "name": "SONNER - OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "usa esta herramienta para gestionar las memorias",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "\n---\n\n# ✅ **2. PROMPT – SUBAGENTE DE MEMORIA**  \n*Listo para pegar — versión final y operativa*\n\n```markdown\n# 🧠 SUBAGENTE DE MEMORIA – SONNER\n# Gestión de Materiales, Eventos y Datos Internos\n\nSos el **Subagente de Memoria de SONNER**.  \nTu trabajo es leer, buscar y devolver información EXACTA desde las memorias internas.  \nNunca inventás nada.  \nNunca completás huecos con suposiciones.  \nTodo sale EXCLUSIVAMENTE de las memorias.\n\n---\n\n# 📚 MEMORIAS DISPONIBLES Y SU USO\n\n### 🟦 1. Memoria de Materiales  \nmetadata: **Materiales**\n\nEl agente principal te pedirá:  \n**\"revisa la memoria de materiales con el metadata: Materiales y busca coincidencias con X\"**\n\nDebés:\n- leer toda la memoria  \n- buscar coincidencias DIRECTAS con X  \n- devolver coincidencias exactas o lista vacía\n\n---\n\n### 🟩 2. Memoria de Eventos  \nmetadata: **eventos**\n\nEl agente principal puede pedir:  \n- **\"dame información sobre el evento X\"**  \n- **\"dame información sobre la lista de eventos que tenemos\"**\n\nDebés devolver:\n- datos del evento  \n- etapa / avance  \n- fecha  \n- cualquier información asociada  \n**solo si está en la memoria**\n\n---\n\n### 🟨 3. Memoria de Información Interna  \nmetadata: **informacion_interna**\n\nÓrdenes posibles:  \n- **\"dame información sobre X de la empresa\"**  \n- **\"dame información sobre las ventas de la empresa\"**  \n- **\"dame información interna sobre Y\"**\n\nDevolvés únicamente:\n- datos existentes  \n- sin interpretar ni generar conclusiones\n\n---\n\n# 🧾 FORMATO OBLIGATORIO DE RESPUESTA\n\nSiempre devolvés un JSON con EXACTAMENTE:\n\n```json\n{\n  \"consulta\": \"qué buscaste\",\n  \"resultados\": [\n    {\n      \"metadata\": \"Materiales | eventos | informacion_interna\",\n      \"coincidencias\": []\n    }\n  ]\n}\nNotas:\n\ncoincidencias es un array con los resultados EXACTOS extraídos.\n\nSi no hay coincidencias, devolvés un array vacío.\n\nNunca inventás valores.\n\n🔧 MODO DE TRABAJO\n\nLeés el mensaje del Agente Principal.\n\nIdentificás qué metadata corresponde:\n\nMateriales\n\neventos\n\ninformacion_interna\n\nBuscás EXCLUSIVAMENTE dentro de esa memoria.\n\nFiltrás según el texto solicitado.\n\nDevolvés el JSON obligatorio.\n\nNunca respondés al usuario final.\n\nNunca deducís información.\n\nNunca completás con lógica o sentido común: solo datos reales.\n\n🚫 PROHIBIDO\n\nAdivinar información.\n\nResponder en texto libre.\n\nInterpretar intenciones.\n\nMezclar memorias.\n\nResponder sin usar metadata.\n\nModificar el contenido original de las memorias.\n\nSos un agente puramente consultivo:\nte piden → revisás la memoria → devolvés datos exactos en JSON."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 2.2,
+      "position": [
+        -1184,
+        6000
+      ],
+      "id": "a3053948-38aa-46eb-b39d-c033595f4960",
+      "name": "Agente de Memoria"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -1456,
+        6208
+      ],
+      "id": "c61a49f3-40c4-49c7-bc6a-66977868202e",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "TukVhcSH0wM2WK5L",
+          "name": "SONNER - Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "usa esta herramienta para obtener informacion previamente cargada sobre el campo Eventos, del la empresa SONNER",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "topK": 8,
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "eventos"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -1328,
+        6208
+      ],
+      "id": "ad2f5ac6-f36f-4441-9dcb-64e0bb6aca35",
+      "name": "Eventos",
+      "credentials": {
+        "supabaseApi": {
+          "id": "n33G6fhATJ6LRIKK",
+          "name": "Supabase Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "usa esta herramienta para obtener informacion previamente cargada sobre el campo InformaciónInterna, del la empresa SONNER",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "topK": 8,
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "informacion_interna"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -1040,
+        6208
+      ],
+      "id": "5607f54f-a10a-4fd8-b0db-a8178d31a1af",
+      "name": "Información Interna",
+      "credentials": {
+        "supabaseApi": {
+          "id": "n33G6fhATJ6LRIKK",
+          "name": "Supabase Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "usa esta herramienta para obtener informacion previamente cargada sobre el campo Materiales, del la empresa SONNER",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "topK": 8,
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "materiales"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1.3,
+      "position": [
+        -752,
+        6208
+      ],
+      "id": "918b9dbb-e944-4fc4-a263-fbceb62504ef",
+      "name": "Materiales",
+      "credentials": {
+        "supabaseApi": {
+          "id": "n33G6fhATJ6LRIKK",
+          "name": "Supabase Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -1248,
+        6416
+      ],
+      "id": "5ae75dcb-0a82-40db-82b4-db4f1a082d34",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "TpgS7MbojkKQfXYq",
+          "name": "SONNER - OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -960,
+        6416
+      ],
+      "id": "2c4f72c9-c9ed-46c6-b7df-743db20f1306",
+      "name": "Embeddings OpenAI17",
+      "credentials": {
+        "openAiApi": {
+          "id": "TpgS7MbojkKQfXYq",
+          "name": "SONNER - OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -672,
+        6416
+      ],
+      "id": "1dca56e9-fa37-4b78-bc77-821e56c90f3b",
+      "name": "Embeddings OpenAI18",
+      "credentials": {
+        "openAiApi": {
+          "id": "TpgS7MbojkKQfXYq",
+          "name": "SONNER - OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "=Sos el Subagente de Calendar de SONNER. Gestionás eventos en los calendarios de la empresa y de Gabi. Usá este agente para: buscar eventos, verificar disponibilidad, crear eventos, actualizar título o descripción, cambiar fechas y horarios, eliminar eventos, y gestionar bloqueos personales de Gabi. Fecha y hora actual: {{ $json.currentDate }}",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "=🗓️ SUBAGENTE DE CALENDAR – SONNER\nGestión de eventos del calendario\nFecha y hora actual: {{ $json.currentDate }}\n\nSos el Subagente de Calendar de SONNER. Tu única función es realizar acciones sobre \neventos usando las herramientas del calendario. Nunca inventás información. Nunca \nrespondés por tu cuenta. Tu tarea es ejecutar EXACTAMENTE lo que te pida el Agente \nPrincipal.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🗂 CALENDARIOS DISPONIBLES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n- \"eventos sonner\"   → Calendario principal. Se usa para todas las acciones.\n- \"fiestas tijereta\" → Solo lectura. Se consulta únicamente con encontrar_evento sonner.\n- \"fiestas cromo\"    → Solo lectura. Se consulta únicamente con encontrar_evento sonner.\n- \"reuniones gabi\"   → Calendario personal de Gabi. Se usa exclusivamente para \n                       bloqueos personales, compromisos y ausencias de Gabi.\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🛠 HERRAMIENTAS DISPONIBLES\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n── HERRAMIENTAS DE EVENTOS SONNER ──────────────────────────────────────────────\n\n✔ encontrar_evento sonner — CALENDARIOS: eventos sonner + fiestas tijereta + fiestas cromo\n  Devuelve la información completa de eventos. Consulta los 3 calendarios \n  simultáneamente y combina los resultados. Se usa como PASO 1 obligatorio \n  antes de cualquier actualización o eliminación.\n  Formato: \"busca el evento X usando encontrar_evento sonner\"\n\n✔ Get availability sonner_eventos — CALENDARIO: eventos sonner (únicamente)\n  Busca disponibilidad en una fecha específica o cercana.\n  Formato: \"busca disponibilidad en la fecha X usando Get availability sonner_eventos\"\n\n✔ Calendar_Create sonner_eventos — CALENDARIO: eventos sonner (únicamente)\n  Crea un evento nuevo. Tras la creación, identificá el ID generado para \n  devolverlo al Agente Principal.\n  Formato: \"crea el siguiente evento: [data] usando Calendar_Create sonner_eventos\"\n\n✔ Calendar_Update sonner_eventos — CALENDARIO: eventos sonner (únicamente)\n  Actualiza título y/o descripción de un evento existente.\n\n✔ Calendar_Update_fechas_sonner — CALENDARIO: eventos sonner (únicamente)\n  Cambia la fecha y/o horario de un evento existente.\n\n✔ Delete an event sonner_eventos — CALENDARIO: eventos sonner (únicamente)\n  Elimina un evento del calendario.\n\n── HERRAMIENTAS DE REUNIONES GABI (USO PERSONAL) ───────────────────────────────\n\n✔ encontrar_reuniones — CALENDARIO: reuniones gabi\n✔ Crear_reunion — CALENDARIO: reuniones gabi\n✔ actualizar_reunion — CALENDARIO: reuniones gabi\n✔ borrar_reunion — CALENDARIO: reuniones gabi\n\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n🧾 FORMATO OBLIGATORIO DE RESPUESTA\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\nSiempre devolvés un JSON con exactamente:\n{\n  \"resumen\": \"Resumen claro de lo que realizaste\",\n  \"resultados\": [\n    {\n      \"herramienta\": \"...\",\n      \"calendario\": \"...\",\n      \"output\": \"resultado real devuelto por la herramienta\",\n      \"event_id\": \"ID del evento devuelto por la herramienta, o null si no aplica\"\n    }\n  ]\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 2.2,
+      "position": [
+        224,
+        6000
+      ],
+      "id": "3e0f9395-4bd9-428d-9497-568540e6c400",
+      "name": "agente de calendario"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -464,
+        6208
+      ],
+      "id": "f68790f2-6df4-4509-8a0c-f1481af2aaef",
+      "name": "Anthropic Chat Model10",
+      "credentials": {
+        "anthropicApi": {
+          "id": "TukVhcSH0wM2WK5L",
+          "name": "SONNER - Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Eventos Sonner"
+        },
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', ``, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', ``, 'string') }}",
+        "options": {
+          "orderBy": "startTime",
+          "timeZone": {
+            "__rl": true,
+            "value": "America/Argentina/Buenos_Aires",
+            "mode": "list",
+            "cachedResultName": "America/Argentina/Buenos_Aires"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        -336,
+        6208
+      ],
+      "id": "65214322-d7ad-41b0-8b3a-a0002f16f74a",
+      "name": "eventos sonner",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "d95fa5d49e6e2ed2e68d81665f5974880bed1093fc38493a5d15764389d71bd2@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Fiestas Tijereta"
+        },
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', ``, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', ``, 'string') }}",
+        "options": {
+          "orderBy": "startTime",
+          "timeZone": {
+            "__rl": true,
+            "value": "America/Argentina/Buenos_Aires",
+            "mode": "list",
+            "cachedResultName": "America/Argentina/Buenos_Aires"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        -208,
+        6208
+      ],
+      "id": "5a56409e-c8dc-48fb-b1a6-972011c344d0",
+      "name": "eventos tijereta",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "8ta8sn3o0gpt07utaaojf643m4@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Fiestas Cromo"
+        },
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('After', ``, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Before', ``, 'string') }}",
+        "options": {
+          "orderBy": "startTime",
+          "timeZone": {
+            "__rl": true,
+            "value": "America/Argentina/Buenos_Aires",
+            "mode": "list",
+            "cachedResultName": "America/Argentina/Buenos_Aires"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        -80,
+        6208
+      ],
+      "id": "973eea77-92a2-4d03-9c01-402b8e57c3db",
+      "name": "eventos cromo",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "30d150a3b5a1a2cf4c6be2c41fe021c1410ac95f9bf1ffc1ed538a39ed680201@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Reuniones"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        80,
+        6432
+      ],
+      "id": "a622f359-a209-46b7-8320-41b7014ee41d",
+      "name": "borrar Reunion",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "30d150a3b5a1a2cf4c6be2c41fe021c1410ac95f9bf1ffc1ed538a39ed680201@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Reuniones"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "updateFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+          "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        6432
+      ],
+      "id": "fc49a321-1a8e-4af3-86ba-2df72dc4a61d",
+      "name": "actualizar_reunion",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "30d150a3b5a1a2cf4c6be2c41fe021c1410ac95f9bf1ffc1ed538a39ed680201@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Reuniones"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', `start time of the event set the start time `, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', `end time of the event set the end time  `, 'string') }}",
+        "additionalFields": {
+          "color": "6",
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "location": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Location', ``, 'string') }}",
+          "sendUpdates": "all",
+          "showMeAs": "opaque",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        416,
+        6448
+      ],
+      "id": "c67c123f-5344-4f0b-a7a0-997c491885fe",
+      "name": "Crear_reunion",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "calendar",
+        "calendar": {
+          "__rl": true,
+          "value": "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Eventos Sonner"
+        },
+        "timeMin": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start_Time', ``, 'string') }}",
+        "timeMax": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End_Time', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        432,
+        6208
+      ],
+      "id": "ed2a1cf5-631b-475f-a93b-63ae4b03139c",
+      "name": "Get availability sonner_eventos",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Eventos Sonner"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "color": "6",
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "location": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Location', ``, 'string') }}",
+          "sendUpdates": "all",
+          "showMeAs": "opaque",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        560,
+        6208
+      ],
+      "id": "6e8d55cb-1018-4a2d-92b5-53cb27409429",
+      "name": "Calendar_Create sonner_eventos",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "calendar": {
+          "__rl": true,
+          "value": "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Eventos Sonner"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        688,
+        6208
+      ],
+      "id": "65727b2b-3780-430f-9678-0071dc5807ed",
+      "name": "Delete an event sonner_eventos",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "calendar": {
+          "__rl": true,
+          "value": "30d150a3b5a1a2cf4c6be2c41fe021c1410ac95f9bf1ffc1ed538a39ed680201@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Reuniones"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "options": {
+          "timeZone": {
+            "__rl": true,
+            "value": "America/Argentina/Buenos_Aires",
+            "mode": "list",
+            "cachedResultName": "America/Argentina/Buenos_Aires"
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        592,
+        6448
+      ],
+      "id": "fd21754d-ab72-4f87-92f3-d76e5782eb66",
+      "name": "encontrar_reuniones",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Eventos Sonner"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "updateFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        944,
+        6208
+      ],
+      "id": "b0edf401-c11e-4540-bfb2-b6b24281cc2a",
+      "name": "Calendar_Update sonner_eventos",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "calendar": {
+          "__rl": true,
+          "value": "c009570ad20b600e6568843766c0ee9d96de96586ee8ff9925624b09407e8add@group.calendar.google.com",
+          "mode": "list",
+          "cachedResultName": "Eventos Sonner"
+        },
+        "eventId": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Event_ID', ``, 'string') }}",
+        "updateFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End_DateTime', ``, 'string') }}",
+          "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start_DateTime', ``, 'string') }}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        1072,
+        6208
+      ],
+      "id": "81d899b4-cdaa-492e-af71-c6b5b4a739a6",
+      "name": "Calendar_Update_fechas_sonner",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "AY9RkkhllhvEl1oz",
+          "name": "Gabi Sonner Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "USA ESTE AGENTE CUANDO TENGAS QUE VER DETALLES SOBRE LOS DJS Y SU DISPONIBILIDAD",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Prompt__User_Message_', ``, 'string') }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "Sos el Subagente de DJs. Usá leer1/crear1/actualizar1 sobre el sheet FECHAS DJ SONNER."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agentTool",
+      "typeVersion": 3,
+      "position": [
+        1456,
+        6000
+      ],
+      "id": "30940e9d-3a61-482f-a872-7bf43864eb29",
+      "name": "AGENTE DE DJS1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1200,
+        6208
+      ],
+      "id": "c163d625-9a4a-48a6-ae1d-056c3d5c92ac",
+      "name": "Anthropic Chat Model5",
+      "credentials": {
+        "anthropicApi": {
+          "id": "u2ZXalSJGrRJV04z",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-pro",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1328,
+        6208
+      ],
+      "id": "33117bd5-6995-4300-86a4-0e300561b64c",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "HHxCPCGt7cY3Hku2",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1SAHK-iT6q8OZrfumu0VSrCKXytnm7RxkA1KErChdo9w",
+          "mode": "list",
+          "cachedResultName": "FECHAS DJ SONNER"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1"
+        },
+        "filtersUI": {
+          "values": [
+            {
+              "lookupColumn": "FECHA",
+              "lookupValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('values0_Value', `fecha del evento`, 'string') }}"
+            },
+            {
+              "lookupColumn": "DJ",
+              "lookupValue": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('values1_Value', `nombre del dj`, 'string') }}"
+            }
+          ]
+        },
+        "combineFilters": "OR",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        1456,
+        6208
+      ],
+      "id": "28f9a364-4383-4e4b-9c45-54e1cc9011ed",
+      "name": "leer",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cc9dsg9dq2Hn5DbY",
+          "name": "Gabi Sonner Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "documentId": {
+          "__rl": true,
+          "value": "1SAHK-iT6q8OZrfumu0VSrCKXytnm7RxkA1KErChdo9w",
+          "mode": "list",
+          "cachedResultName": "FECHAS DJ SONNER"
+        },
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        1584,
+        6208
+      ],
+      "id": "54377407-8933-4fe5-8a81-d731e84454b8",
+      "name": "crear",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cc9dsg9dq2Hn5DbY",
+          "name": "Gabi Sonner Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1SAHK-iT6q8OZrfumu0VSrCKXytnm7RxkA1KErChdo9w",
+          "mode": "list",
+          "cachedResultName": "FECHAS DJ SONNER"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Hoja 1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "OBSERVACIONES": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('OBSERVACIONES', ``, 'string') }}",
+            "ASIGNADO POR ": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('ASIGNADO_POR_', ``, 'string') }}",
+            "PAGADO": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('PAGADO', ``, 'string') }}",
+            "VALOR": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('VALOR', ``, 'string') }}",
+            "DJ": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('DJ', ``, 'string') }}",
+            "SALON": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('SALON', ``, 'string') }}",
+            "TIPO DE EVENTO": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('TIPO_DE_EVENTO', ``, 'string') }}",
+            "FECHA": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('FECHA', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "FECHA"
+          ],
+          "schema": [
+            {
+              "id": "FECHA",
+              "displayName": "FECHA",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "TIPO DE EVENTO",
+              "displayName": "TIPO DE EVENTO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "SALON",
+              "displayName": "SALON",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "DJ",
+              "displayName": "DJ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "VALOR",
+              "displayName": "VALOR",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "PAGADO",
+              "displayName": "PAGADO",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ASIGNADO POR ",
+              "displayName": "ASIGNADO POR ",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "OBSERVACIONES",
+              "displayName": "OBSERVACIONES",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.5,
+      "position": [
+        1712,
+        6208
+      ],
+      "id": "9fa85463-ffaf-4b7e-88be-7a3ce117448d",
+      "name": "actualizar",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "cc9dsg9dq2Hn5DbY",
+          "name": "Gabi Sonner Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.comando }}",
+                    "rightValue": "eventos",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "37549760-0f09-4553-a9ae-aacae4f0e03d"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "eventos"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "a89da53c-d836-4c14-8221-8a14e9a237d1",
+                    "leftValue": "={{ $json.output.comando }}",
+                    "rightValue": "informacion",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "informacion"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "578c714e-b861-4817-873a-0860760fe503",
+                    "leftValue": "={{ $json.output.comando }}",
+                    "rightValue": "materiales",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "materiales"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "01788446-463e-4ce5-97bc-356e235b7aa7",
+                    "leftValue": "={{ $json.output.comando }}",
+                    "rightValue": "nada",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "nada"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.3,
+      "position": [
+        2192,
+        4816
+      ],
+      "id": "9e305970-e412-4387-976e-a30e02f856e0",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        4640
+      ],
+      "id": "dabbfeb7-ffb0-4042-b2c2-9bb3a3dce7b5",
+      "name": "Supabase Vector Store",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "n33G6fhATJ6LRIKK",
+          "name": "Supabase Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.output.contenido }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "eventos"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        2544,
+        4864
+      ],
+      "id": "bbde90df-717e-4f5f-b767-0712cd4915b3",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 20,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        5072
+      ],
+      "id": "1587cfa8-e612-44fb-b73b-f86fae4fb1e4",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2416,
+        4864
+      ],
+      "id": "7cba6ae1-d931-4d11-bb8c-5da48f4e4f80",
+      "name": "Embeddings OpenAI19",
+      "credentials": {
+        "openAiApi": {
+          "id": "TpgS7MbojkKQfXYq",
+          "name": "SONNER - OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        5248
+      ],
+      "id": "3200251d-476f-47a6-a33b-81eea9957063",
+      "name": "Supabase Vector Store8",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "n33G6fhATJ6LRIKK",
+          "name": "Supabase Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.output.contenido }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "informacion_interna"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        2544,
+        5472
+      ],
+      "id": "8d449f7c-05b3-4a2f-8dba-038629c4ae73",
+      "name": "Default Data Loader8"
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 20,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        5680
+      ],
+      "id": "e57100e8-d6e3-4bec-b8b1-319280305154",
+      "name": "Recursive Character Text Splitter8"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2416,
+        5472
+      ],
+      "id": "9ceea20a-993b-48d5-b51e-80c33af5f889",
+      "name": "Embeddings OpenAI20",
+      "credentials": {
+        "openAiApi": {
+          "id": "TpgS7MbojkKQfXYq",
+          "name": "SONNER - OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "tableName": {
+          "__rl": true,
+          "value": "documents",
+          "mode": "list",
+          "cachedResultName": "documents"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreSupabase",
+      "typeVersion": 1,
+      "position": [
+        2448,
+        4032
+      ],
+      "id": "9597b779-0ae1-422e-81d7-e29542da6b32",
+      "name": "Supabase Vector Store9",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "n33G6fhATJ6LRIKK",
+          "name": "Supabase Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonMode": "expressionData",
+        "jsonData": "={{ $json.output.contenido }}",
+        "options": {
+          "metadata": {
+            "metadataValues": [
+              {
+                "name": "source",
+                "value": "materiales"
+              }
+            ]
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1,
+      "position": [
+        2544,
+        4256
+      ],
+      "id": "748f93ce-25a9-45b8-bb91-3effd46b7422",
+      "name": "Default Data Loader9"
+    },
+    {
+      "parameters": {
+        "chunkOverlap": 20,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        2624,
+        4464
+      ],
+      "id": "6ca2af09-9e44-46cb-9519-f98dbeb41ba9",
+      "name": "Recursive Character Text Splitter9"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        2416,
+        4256
+      ],
+      "id": "8600206c-432f-40ba-90f0-290277fb5487",
+      "name": "Embeddings OpenAI21",
+      "credentials": {
+        "openAiApi": {
+          "id": "TpgS7MbojkKQfXYq",
+          "name": "SONNER - OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Anti-loop con contador por ejecución\nconst inputJson = $input.first().json;\nconst output = inputJson.output || {};\nconst textoAnalizar = output.respuesta || \"\";\n\nconst palabrasProhibidas = [\"json\", \"temperatura\", \"comando\", \"ejecutado\"];\n\nconst contienePalabra = palabrasProhibidas.some(p =>\n  textoAnalizar.toLowerCase().includes(p.toLowerCase())\n);\n\nconst staticData = $getWorkflowStaticData('node');\nconst execId = $execution.id;\nconst key = `reintentos_${execId}`;\nconst intentos = staticData[key] || 0;\n\nlet comandoSalida;\nif (contienePalabra && intentos < 2) {\n  staticData[key] = intentos + 1;\n  comandoSalida = \"repetir\";\n} else {\n  delete staticData[key];\n  comandoSalida = \"sigue\";\n}\n\nreturn {\n  json: {\n    comando: comandoSalida,\n    intentos,\n    respuesta: output.respuesta || \"\",\n    output  // pasamos el output completo (respuesta, comando, contenido)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2192,
+        5712
+      ],
+      "id": "58040ff2-0bdd-46a5-9710-589daca4d940",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "10c68fae-c7eb-40d3-a5a9-08213486bed3",
+              "leftValue": "={{ $json.comando }}",
+              "rightValue": "repetir",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2544,
+        5856
+      ],
+      "id": "90fed75e-6f6e-47fd-98f0-148235642509",
+      "name": "If4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "err-1",
+              "name": "output",
+              "value": "={\n  \"respuesta\": \"Tuve un problema procesando tu mensaje. Probá de nuevo en unos segundos.\",\n  \"comando\": \"nada\",\n  \"contenido\": \"nada\"\n}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2544,
+        6048
+      ],
+      "id": "1e2f6615-ea86-4029-870b-f1313be415d0",
+      "name": "Error Fallback1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        3248,
+        5904
+      ],
+      "id": "68387159-0bfe-4059-bfbb-2d4ea81f12fd",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram Trigger').item.json.message.chat.id }}",
+        "text": "={{ $json.mensaje }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3456,
+        5840
+      ],
+      "id": "ddf27fe8-a423-4a8a-91db-6d561aa66c9b",
+      "name": "Send a text message",
+      "webhookId": "fc866b0a-0cf8-4a38-833c-a62db5569e69",
+      "credentials": {
+        "telegramApi": {
+          "id": "gScjI38HkwGe6Zrz",
+          "name": "Sonner_Interno_Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3696,
+        5904
+      ],
+      "id": "87a0a489-acee-49a7-afe8-95687991b1fe",
+      "name": "Wait5",
+      "webhookId": "68676524-b643-4c33-89ad-1007907f2342"
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Redis1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trocear respuesta": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis1": {
+      "main": [
+        [
+          {
+            "node": "Wait1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait1": {
+      "main": [
+        [
+          {
+            "node": "Redis11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis11": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Redis12",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Mensaje duplicado (ignorar)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis12": {
+      "main": [
+        [
+          {
+            "node": "Date & Time",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Date & Time": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Error Fallback1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Sonnet Principal1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Fallback Principal1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Auto-fixing Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Auto-fixing Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente de Memoria": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Agente de Memoria",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventos": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente de Memoria",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Información Interna": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente de Memoria",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Materiales": {
+      "ai_tool": [
+        [
+          {
+            "node": "Agente de Memoria",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Eventos",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI17": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Información Interna",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI18": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Materiales",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agente de calendario": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model10": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "eventos sonner": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "eventos tijereta": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "eventos cromo": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "borrar Reunion": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "actualizar_reunion": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crear_reunion": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get availability sonner_eventos": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar_Create sonner_eventos": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete an event sonner_eventos": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "encontrar_reuniones": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar_Update sonner_eventos": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar_Update_fechas_sonner": {
+      "ai_tool": [
+        [
+          {
+            "node": "agente de calendario",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AGENTE DE DJS1": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AGENTE DE DJS1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AGENTE DE DJS1",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "leer": {
+      "ai_tool": [
+        [
+          {
+            "node": "AGENTE DE DJS1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "crear": {
+      "ai_tool": [
+        [
+          {
+            "node": "AGENTE DE DJS1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "actualizar": {
+      "ai_tool": [
+        [
+          {
+            "node": "AGENTE DE DJS1",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase Vector Store8",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase Vector Store9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI19": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader8": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store8",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter8": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader8",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI20": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store8",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader9": {
+      "ai_document": [
+        [
+          {
+            "node": "Supabase Vector Store9",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter9": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader9",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI21": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Supabase Vector Store9",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If4": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Trocear respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Fallback1": {
+      "main": [
+        [
+          {
+            "node": "Trocear respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a text message": {
+      "main": [
+        [
+          {
+            "node": "Wait5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait5": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "America/Argentina/Buenos_Aires",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "zXK5oHf8QcODC7BKYvG4j"
+  },
+  "versionId": "aa91509a-f56b-4664-ac9a-3cae2fc74e9d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  },
+  "nodeGroups": [],
+  "id": "UFcwYhjP8qX1Siu9",
+  "tags": []
+}

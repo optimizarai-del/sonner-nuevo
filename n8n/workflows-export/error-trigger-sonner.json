@@ -1,0 +1,100 @@
+{
+  "name": "error trigger sonner",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -272,
+        16
+      ],
+      "id": "9777b083-455f-4feb-b391-62e2b0cd799c",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "sendTo": "rodriguezfederico765@gmail.com",
+        "subject": "=Error en workflow sonner -  {{ $json.workflow.name }}",
+        "emailType": "text",
+        "message": "=hubo un error en el flow de sonner  {{ $json.execution.error.message }}\n\nlink directo a la ejecucion {{ $json.execution.url }}\n\nerror: {{ $json.execution.error.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        -64,
+        16
+      ],
+      "id": "1ec2d5d2-c8d8-4261-83da-100cae2acf30",
+      "name": "Send a message",
+      "webhookId": "9325a9b6-dfac-40a3-8a26-54f1f9a6bce4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "lwwL5uP1qayBnj8t",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "optimizar.ai@gmail.com",
+        "subject": "=Error en workflow sonner -  {{ $json.workflow.name }}",
+        "emailType": "text",
+        "message": "=hubo un error en el flow de sonner  {{ $json.execution.error.message }}\n\nlink directo a la ejecucion {{ $json.execution.url }}\n\nerror: {{ $json.execution.error.message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        176,
+        0
+      ],
+      "id": "915f302b-14be-45b2-af94-7f3b72271a73",
+      "name": "Send a message1",
+      "webhookId": "9325a9b6-dfac-40a3-8a26-54f1f9a6bce4",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "lwwL5uP1qayBnj8t",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "908d3c4f-0bdf-46dd-83b2-14bbc480d88a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  },
+  "id": "zXK5oHf8QcODC7BKYvG4j",
+  "tags": []
+}

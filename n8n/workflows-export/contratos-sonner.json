@@ -1,0 +1,401 @@
+{
+  "name": "contratos sonner",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "copy",
+        "fileId": {
+          "__rl": true,
+          "value": "16TLMxsuWMaq71Hu3rl41dSxucm53zOXwhBkatFlhTHQ",
+          "mode": "list",
+          "cachedResultName": "Copia de contrato modelo ",
+          "cachedResultUrl": "https://docs.google.com/document/d/16TLMxsuWMaq71Hu3rl41dSxucm53zOXwhBkatFlhTHQ/edit?usp=drivesdk"
+        },
+        "name": "=contrato {{ $json.body.nombre_prestatario }} {{ $json.body.dia_evento }}",
+        "sameFolder": false,
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1sW7cimpe6ExqviGY_0hYTUa5C7dDA7rU",
+          "mode": "list",
+          "cachedResultName": "SONNER/OPTIMIZAR",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1sW7cimpe6ExqviGY_0hYTUa5C7dDA7rU"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -240,
+        -48
+      ],
+      "id": "e006961a-dc91-4605-8717-c0c3dc0bbfd1",
+      "name": "Make Copy of Template",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "34Gm0MFcRuPHLxS0",
+          "name": "Gabi Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ $json.id }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "replaceAll",
+              "text": "(nombre_prestatario)",
+              "replaceText": "={{ $('Webhook').item.json.body.nombre_prestatario }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(DNI_prestatario)",
+              "replaceText": "={{ $('Webhook').item.json.body.DNI_prestatario }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(domicilio_prestatario)",
+              "replaceText": "={{ $('Webhook').item.json.body.domicilio_prestatario }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(lugar_evento)",
+              "replaceText": "={{ $('Webhook').item.json.body.lugar_evento }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(dia_evento)",
+              "replaceText": "={{ $('Webhook').item.json.body.dia_evento }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(hora_inicio)",
+              "replaceText": "={{ $('Webhook').item.json.body.hora_inicio }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(hora_fin)",
+              "replaceText": "={{ $('Webhook').item.json.body.hora_fin }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(dias_para_pagar)",
+              "replaceText": "={{ $('Webhook').item.json.body.dias_para_pagar }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(valor_total_prestacion)",
+              "replaceText": "=$ {{ $('Webhook').item.json.body.valor_total_prestacion }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(monto_total_pesos)",
+              "replaceText": "=$ {{ $('Webhook').item.json.body.monto_total_pesos }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(monto_total_reserva) ",
+              "replaceText": "=$ {{ $('Webhook').item.json.body.monto_total_reserva }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(saldo_a_cancelar)",
+              "replaceText": "=$ {{ $('Webhook').item.json.body.saldo_a_cancelar }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(dia_firma)",
+              "replaceText": "={{ $('Webhook').item.json.body.dia_firma }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(mes_firma)",
+              "replaceText": "={{ $('Webhook').item.json.body.mes_firma }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(año_firma)",
+              "replaceText": "={{ $('Webhook').item.json.body['año_firma'] }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(Equipamientos)",
+              "replaceText": "={{ $('Webhook').item.json.body.equipamientos }}"
+            },
+            {
+              "action": "replaceAll",
+              "text": "(dia_postevento)",
+              "replaceText": "={{ DateTime.fromISO($('Webhook').item.json.body.dia_evento).plus({days: 1}).toISODate() }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocs",
+      "typeVersion": 2,
+      "position": [
+        -16,
+        -48
+      ],
+      "id": "47400c1a-3052-4c4d-936f-52d5c8944bec",
+      "name": "Change Custom Variables",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "5bTP0wKUUBr8t8VO",
+          "name": "Gabi Sonner Docs"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.documentId }}",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "data",
+          "googleFileConversion": {
+            "conversion": {
+              "docsToFormat": "application/pdf"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        208,
+        -48
+      ],
+      "id": "643b513b-cafa-40d6-bbef-4ea62e74ecd3",
+      "name": "Generate PDF",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "34Gm0MFcRuPHLxS0",
+          "name": "Gabi Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Make Copy of Template').item.json.name }}",
+        "driveId": {
+          "__rl": true,
+          "value": "My Drive",
+          "mode": "list",
+          "cachedResultName": "My Drive",
+          "cachedResultUrl": "https://drive.google.com/drive/my-drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1CuOv1EDBskL5T3-kzT_cBYE6F9Gz4qnw",
+          "mode": "list",
+          "cachedResultName": "Contratos sonner",
+          "cachedResultUrl": "https://drive.google.com/drive/folders/1CuOv1EDBskL5T3-kzT_cBYE6F9Gz4qnw"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        432,
+        -48
+      ],
+      "id": "6c054c1a-8125-46b8-8b6a-93744a21a8fb",
+      "name": "Add PDF To Drive",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "34Gm0MFcRuPHLxS0",
+          "name": "Gabi Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        656,
+        -48
+      ],
+      "id": "e3b17c85-aca1-4b84-bb0d-fa72b10de6c1",
+      "name": "Share file1",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "34Gm0MFcRuPHLxS0",
+          "name": "Gabi Sonner"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ffddd034-a86a-4fc7-b6b0-2495316f6bd5",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -464,
+        -48
+      ],
+      "id": "aef6f321-ab1a-4fb6-84fc-b8c892e414e0",
+      "name": "Webhook",
+      "webhookId": "ffddd034-a86a-4fc7-b6b0-2495316f6bd5"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\n  \"status\": \"success\",\n  \"message\": \"Link de archivo: {{ $('Add PDF To Drive').item.json.webContentLink }} \"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        864,
+        -48
+      ],
+      "id": "73cd8272-c0b5-491e-820a-b9248023eddc",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "sendTo": "Gabrieldj88@gmail.com",
+        "subject": "=Contrato  {{ $('Webhook').item.json.body.nombre_prestatario }} realizado",
+        "emailType": "text",
+        "message": "=Aqui tienes el link para poder acceder al contrato de {{ $('Webhook').item.json.body.nombre_prestatario }}|Puedes descargarlo haciendo click aquí:  {{ $('Add PDF To Drive').item.json.webContentLink }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1072,
+        -48
+      ],
+      "id": "0cef358d-a254-4ad0-882c-b4a973c380a6",
+      "name": "Send a message",
+      "webhookId": "7fc5ea14-bba9-4f39-b5c0-91dfb9fe64ca",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "KmoOIeHI282TNoVh",
+          "name": "SONNER GMAIL"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Make Copy of Template": {
+      "main": [
+        [
+          {
+            "node": "Change Custom Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Change Custom Variables": {
+      "main": [
+        [
+          {
+            "node": "Generate PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate PDF": {
+      "main": [
+        [
+          {
+            "node": "Add PDF To Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add PDF To Drive": {
+      "main": [
+        [
+          {
+            "node": "Share file1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Make Copy of Template",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Share file1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond to Webhook": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "40eac2e8-f573-4df0-9218-1eda705ad7c3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5e65abf8b4410a3a3892b11b2636f8c46d6f727c5a7e3825146c218f7b367da8"
+  },
+  "nodeGroups": [],
+  "id": "6v3twiXDcPirJiajXcmKR",
+  "tags": []
+}

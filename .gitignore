@@ -45,4 +45,7 @@ backend/google_client_secrets.json
 *.json
 !frontend/package.json
 !frontend/package-lock.json
+# Workflows de n8n versionados: pasan SIEMPRE por scripts/scrub_n8n_export.py,
+# que reemplaza tokens por {{$env.VAR}} y elimina pinData. Ver docs/RUNBOOK.md.
+!n8n/workflows-export/*.json
 db/memoria_export/
