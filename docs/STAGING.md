@@ -23,7 +23,7 @@ evitan que una prueba termine en un cliente o en el calendario real:
 | Campo | Valor |
 |---|---|
 | Tipo | App → GitHub |
-| Repo / rama | `optimizarai-del/sonner-nuevo` · **`migracion-langgraph`** |
+| Repo / rama | `optimizarai-del/sonner-nuevo` · **`Sonner-Python-sp26`** |
 | Build | Dockerfile |
 | Dockerfile | `Dockerfile.agente` |
 | Contexto de build | `backend` (el Dockerfile hace `COPY app` y `COPY requirements.txt`) |
