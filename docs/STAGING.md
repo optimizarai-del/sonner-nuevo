@@ -22,25 +22,43 @@ evitan que una prueba termine en un cliente o en el calendario real:
 
 | Campo | Valor |
 |---|---|
-| Tipo | App → GitHub |
+| Tipo | **Compose** → GitHub |
 | Repo / rama | `optimizarai-del/sonner-nuevo` · **`Sonner-Python-sp26`** |
-| Build | Dockerfile |
-| Dockerfile | `Dockerfile.agente` |
-| Contexto de build | `backend` (el Dockerfile hace `COPY app` y `COPY requirements.txt`) |
-| Puerto | 8000 |
-| Healthcheck | `/health/ready` |
+| Archivo | `docker-compose.agente.yml` |
+| Puerto expuesto | 8000 (servicio `agente`) |
+| Healthcheck externo | `/health/ready` |
 | Nombre sugerido | `sonner-agente-staging` |
+
+El compose levanta dos contenedores: el agente y un Redis. **No incluye Postgres**: la
+base es Supabase, que es externo y se alcanza por HTTPS.
+
+Redis no es decorativo. Sin él, tres cosas pasan a vivir en la memoria del proceso —
+agrupar los mensajes que el cliente manda de a pedacitos, no contestar dos veces el mismo
+mensaje, y que el resumen de las 20:00 salga una sola vez— y el agente queda obligado a
+correr con un único worker. Con Redis, el compose ya arranca con `WEB_CONCURRENCY=2`.
 
 **No** activar auto-deploy desde `agentes-sonner`: esa es la rama de producción.
 
 ## Variables de entorno
 
-Copiar las del servicio de producción y **cambiar** estas:
+Van en la sección **Environment** del servicio, que EasyPanel escribe como el `.env` que
+el compose lee. Copiar las del servicio de producción y **cambiar** estas:
 
 ```
 SONNER_ALERT_ENABLED=false
-WEB_CONCURRENCY=1                 # sin Redis en staging
 JWT_SECRET=<uno nuevo>            # obligatorio: sin esto no arranca
+```
+
+`REDIS_URL` y `WEB_CONCURRENCY` no se cargan a mano: las fija el compose, porque el
+hostname de Redis depende del stack.
+
+La lista completa de variables, con qué hace cada una, está en `backend/.env.example`.
+
+### Para levantarlo local
+
+```bash
+cp backend/.env .env              # el compose lee el .env de la raíz
+docker compose -f docker-compose.agente.yml up --build
 ```
 
 Los IDs de los calendarios de tijereta y cromo y de la planilla de DJs ya vienen como
@@ -59,7 +77,7 @@ KEY=<MEMORIA_INTERNAL_KEY>
 
 # 1. ¿Levantó y ve sus dependencias?
 curl -s $BASE/health/ready          # 200 = Supabase y LLM ok
-curl -s $BASE/health/deps           # redis "sin configurar" es esperado; google tiene que decir "credenciales presentes"
+curl -s $BASE/health/deps           # con el compose, redis tiene que dar "ok"; google, "credenciales presentes"
 
 # 2. ¿Google responde con el token nuevo?
 curl -s -H "X-Memoria-Key: $KEY" "$BASE/api/agente/diag?fecha=2026-12-13&salon=Royal&pax=150"
