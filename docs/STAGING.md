@@ -24,13 +24,18 @@ evitan que una prueba termine en un cliente o en el calendario real:
 |---|---|
 | Tipo | **Compose** → GitHub |
 | Repo / rama | `optimizarai-del/sonner-nuevo` · **`Sonner-Python-sp26`** |
-| Archivo | `docker-compose.agente.yml` |
+| Archivo | `docker-compose.yml` |
 | Puerto expuesto | 8000 (servicio `agente`) |
 | Healthcheck externo | `/health/ready` |
 | Nombre sugerido | `sonner-agente-staging` |
 
 El compose levanta dos contenedores: el agente y un Redis. **No incluye Postgres**: la
 base es Supabase, que es externo y se alcanza por HTTPS.
+
+> EasyPanel usa siempre el `docker-compose.yml` de la raíz e **ignora el nombre de archivo
+> que se elige en el formulario**. Por eso el stack del agente es `docker-compose.yml` y el
+> viejo de desarrollo local pasó a llamarse `docker-compose.dev-legacy.yml`. Si vuelven a
+> convivir dos composes, el deploy va a agarrar el que no querés.
 
 Redis no es decorativo. Sin él, tres cosas pasan a vivir en la memoria del proceso —
 agrupar los mensajes que el cliente manda de a pedacitos, no contestar dos veces el mismo
@@ -41,8 +46,11 @@ correr con un único worker. Con Redis, el compose ya arranca con `WEB_CONCURREN
 
 ## Variables de entorno
 
-Van en la sección **Environment** del servicio, que EasyPanel escribe como el `.env` que
-el compose lee. Copiar las del servicio de producción y **cambiar** estas:
+Van en la sección **Environment** del servicio. EasyPanel las inyecta por su propio
+`docker-compose.override.yml`, no por un archivo del repo: el `.env` está en `.gitignore`
+y nunca va a existir en el servidor. Por eso el compose lo declara como opcional.
+
+Copiar las del servicio de producción y **cambiar** estas:
 
 ```
 SONNER_ALERT_ENABLED=false
@@ -58,7 +66,7 @@ La lista completa de variables, con qué hace cada una, está en `backend/.env.e
 
 ```bash
 cp backend/.env .env              # el compose lee el .env de la raíz
-docker compose -f docker-compose.agente.yml up --build
+docker compose up --build
 ```
 
 Los IDs de los calendarios de tijereta y cromo y de la planilla de DJs ya vienen como

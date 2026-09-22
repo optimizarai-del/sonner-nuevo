@@ -1,0 +1,67 @@
+# LEGACY — desarrollo local del backend viejo + frontend. NO se despliega.
+#
+# Se llamaba docker-compose.yml y se renombró porque EasyPanel agarra ese nombre
+# automáticamente, ignorando el archivo que se elige en el formulario: el deploy del
+# agente terminaba levantando este stack. El del agente es ahora docker-compose.yml.
+#
+# Ojo: el Postgres de acá abajo NO es la base del proyecto. La base es Supabase. Esto
+# quedó de una etapa anterior y el código ya no lee DATABASE_URL.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: sonner
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sonner_pass}
+      POSTGRES_DB: sonner_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sonner -d sonner_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://sonner:${POSTGRES_PASSWORD:-sonner_pass}@postgres:5432/sonner_db
+      - REDIS_URL=redis://redis:6379
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./backend:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host
+
+volumes:
+  postgres_data:
